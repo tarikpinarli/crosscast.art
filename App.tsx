@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Upload, Download, Settings, Box, Play, RefreshCw, Ruler, Activity, Grid as GridIcon } from 'lucide-react';
 import { Viewer3D } from './components/Viewer3D';
-// getAlignedImageData fonksiyonunu import ediyoruz (Hizalama fix'i)
 import { createMask, getAlignedImageData, generateVoxelGeometry, exportToSTL } from './utils/voxelEngine';
 import * as THREE from 'three';
 
@@ -17,7 +16,7 @@ export default function App() {
   const [threshold, setThreshold] = useState(128);
   const [physicalHeight, setPhysicalHeight] = useState(10); 
   
-  // Resolution State (Varsayılan 200 yapıldı, aralık genişletildi)
+  // Resolution State
   const [gridSize, setGridSize] = useState(200);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, setImg: (s: string) => void) => {
@@ -30,16 +29,12 @@ export default function App() {
   };
 
   const processGeometry = useCallback(async () => {
-    // Sadece tek resim olsa bile çalışmasına izin verebiliriz ama ideali ikisidir.
     if (!imgA && !imgB) return;
     setIsProcessing(true);
     
-    // UI render bloklanmasın diye kısa gecikme
     await new Promise(r => setTimeout(r, 100));
 
     try {
-      // --- KRİTİK DEĞİŞİKLİK: getAlignedImageData ---
-      // İki resmi aynı anda gönderiyoruz, fonksiyon bunları hizalayıp geri döndürüyor.
       const [dataA, dataB] = await getAlignedImageData(imgA, imgB, gridSize);
 
       const maskA = dataA ? createMask(dataA, gridSize, threshold) : null;
@@ -55,7 +50,6 @@ export default function App() {
     }
   }, [imgA, imgB, artisticMode, smoothingIterations, threshold, physicalHeight, gridSize]); 
 
-  // Parametreler değişince otomatik yenile (Debounce ile)
   useEffect(() => {
     const timer = setTimeout(() => {
         if(imgA || imgB) processGeometry();
@@ -108,7 +102,6 @@ export default function App() {
           </div>
 
           <div className="space-y-8">
-            {/* Input A */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-300 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-blue-500"></span>
@@ -132,7 +125,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Input B */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-300 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-red-500"></span>
@@ -154,7 +146,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Parameters */}
             <div className="pt-4 border-t border-slate-800 space-y-5">
                <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-slate-400 flex items-center gap-2">
@@ -162,7 +153,6 @@ export default function App() {
                   </h3>
                </div>
                
-               {/* 1. Threshold Slider */}
                <div className="space-y-1">
                  <div className="flex justify-between text-xs text-slate-500">
                     <span>Threshold</span>
@@ -175,7 +165,6 @@ export default function App() {
                  />
                </div>
 
-               {/* 2. Resolution Slider (ARALIĞI GENİŞLETİLDİ) */}
                <div className="space-y-1">
                  <div className="flex justify-between text-xs text-slate-500">
                     <span className="flex items-center gap-1"><GridIcon size={12}/> Resolution</span>
@@ -198,7 +187,6 @@ export default function App() {
                  </div>
                </div>
 
-               {/* 3. Smoothness Slider */}
                <div className="space-y-1">
                  <div className="flex justify-between text-xs text-slate-500">
                     <span className="flex items-center gap-1"><Activity size={12}/> Smoothness</span>
@@ -215,7 +203,6 @@ export default function App() {
                  />
                </div>
 
-               {/* 4. Physical Size Slider */}
                <div className="space-y-1 bg-slate-800/50 p-3 rounded-md border border-slate-800">
                  <div className="flex justify-between text-xs text-slate-400 mb-1">
                     <span className="flex items-center gap-1"><Ruler size={12}/> Target Height</span>
@@ -228,7 +215,6 @@ export default function App() {
                  />
                </div>
 
-               {/* Artistic Toggle */}
                <div className="flex items-center gap-3">
                   <input 
                   type="checkbox" id="artistic" checked={artisticMode} 
@@ -254,7 +240,6 @@ export default function App() {
           </div>
         </aside>
 
-        {/* 3D Viewport */}
         <section className="flex-1 p-6 flex flex-col gap-4 bg-slate-950 relative">
            <Viewer3D geometry={geometry} showGrid={true} isSmooth={smoothingIterations > 0} />
         </section>

@@ -32,7 +32,7 @@ function applySmoothing(geometry: THREE.BufferGeometry, iterations: number = 2) 
   }
 
   const newPositions = new Float32Array(positions);
-  const lambda = 0.8; // Smoothing gücü (0.5 -> 0.8 yaptık)
+  const lambda = 0.8; // Smoothing gücü
 
   for (let k = 0; k < iterations; k++) {
     for (let i = 0; i < vertexCount; i++) {
@@ -98,15 +98,12 @@ function getContentBounds(ctx: CanvasRenderingContext2D, width: number, height: 
   return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1, isEmpty: false };
 }
 
-// --- ANA FONKSİYON: Senkronize Resim İşleme (YENİ) ---
-// İki resmi aynı anda alır, boylarını eşitler ve ortalar.
+// --- ANA FONKSİYON: Senkronize Resim İşleme ---
 export async function getAlignedImageData(srcA: string | null, srcB: string | null, size: number): Promise<[Uint8ClampedArray | null, Uint8ClampedArray | null]> {
     
-    // 1. Resimleri Yükle
     const imgA = srcA ? await loadImage(srcA) : null;
     const imgB = srcB ? await loadImage(srcB) : null;
 
-    // Helper: Resmi canvas'a çiz ve sınırlarını al
     const analyzeImage = (img: HTMLImageElement) => {
         const c = document.createElement('canvas');
         c.width = img.width;
@@ -121,22 +118,16 @@ export async function getAlignedImageData(srcA: string | null, srcB: string | nu
     const infoA = imgA ? analyzeImage(imgA) : null;
     const infoB = imgB ? analyzeImage(imgB) : null;
 
-    // 2. Oranları Hesapla
-    // Amacımız: İki resmin de "İçerik Yüksekliği" (bounds.h) final karede AYNI piksel sayısına denk gelmeli.
-    
-    // Varsayılan olarak kutunun %90'ını yükseklik olarak hedefle
+    // Hedef yükseklik (karenin %90'ı)
     let targetHeight = size * 0.9;
     
-    // A ve B'nin en/boy oranları (Aspect Ratio)
     const arA = infoA && !infoA.bounds.isEmpty ? infoA.bounds.w / infoA.bounds.h : 1;
     const arB = infoB && !infoB.bounds.isEmpty ? infoB.bounds.w / infoB.bounds.h : 1;
 
-    // Eğer bu yükseklikte çizersek genişlikler ne olur?
     let targetWidthA = targetHeight * arA;
     let targetWidthB = targetHeight * arB;
 
-    // 3. Sığdırma Kontrolü
-    // Eğer herhangi bir genişlik kutuyu taşıyorsa (gridSize), yüksekliği düşür.
+    // Sığdırma kontrolü
     if (targetWidthA > size) {
         const scale = size / targetWidthA;
         targetHeight *= scale;
@@ -150,7 +141,6 @@ export async function getAlignedImageData(srcA: string | null, srcB: string | nu
         targetWidthB *= scale;
     }
 
-    // 4. Çizim Fonksiyonu
     const drawToGrid = (info: any, targetW: number, targetH: number) => {
         if (!info) return null;
         const finalCanvas = document.createElement('canvas');
@@ -162,14 +152,13 @@ export async function getAlignedImageData(srcA: string | null, srcB: string | nu
         ctx.fillRect(0, 0, size, size);
 
         if (!info.bounds.isEmpty) {
-            // Tam ortaya çiz
             const x = (size - targetW) / 2;
             const y = (size - targetH) / 2;
 
             ctx.drawImage(
                 info.canvas,
-                info.bounds.x, info.bounds.y, info.bounds.w, info.bounds.h, // Kaynak (Crop)
-                x, y, targetW, targetH // Hedef (Resize & Center)
+                info.bounds.x, info.bounds.y, info.bounds.w, info.bounds.h, 
+                x, y, targetW, targetH 
             );
         }
         return ctx.getImageData(0, 0, size, size).data;
@@ -210,7 +199,6 @@ export function generateVoxelGeometry(
     const imgY = size - 1 - y; 
     for (let z = 0; z < size; z++) {
       for (let x = 0; x < size; x++) {
-        // Maske yoksa o eksende kısıtlama yok demektir (true kabul et)
         let solidA = !maskA || maskA[x][imgY];
         let solidB = !maskB || maskB[z][imgY];
         let isSolid = solidA && solidB;
@@ -225,13 +213,11 @@ export function generateVoxelGeometry(
     }
   }
 
-  // --- Mesh Oluşturma (Greedy Meshing yerine basit Voxel Meshing) ---
   const vertices: number[] = [];
   const indices: number[] = [];
   const vertexMap = new Map<string, number>();
 
   const getOrAddVertex = (vx: number, vy: number, vz: number): number => {
-    // Vertex paylaşımı (smooth shading için kritik)
     const key = `${Math.round(vx*100)},${Math.round(vy*100)},${Math.round(vz*100)}`;
     if (vertexMap.has(key)) return vertexMap.get(key)!;
     const idx = vertices.length / 3;
@@ -269,7 +255,6 @@ export function generateVoxelGeometry(
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
   geometry.setIndex(indices);
   
-  // Smoothing
   if (smoothingIterations > 0 && vertices.length > 0) {
     applySmoothing(geometry, smoothingIterations);
   }
@@ -277,17 +262,14 @@ export function generateVoxelGeometry(
   geometry.computeVertexNormals();
   geometry.computeBoundingBox();
 
-  // Merkezleme ve Ölçekleme
   const centerOffset = new THREE.Vector3();
   geometry.boundingBox?.getCenter(centerOffset);
   geometry.translate(-centerOffset.x, -centerOffset.y, -centerOffset.z);
   
-  // Fiziksel Boyuta Ölçekleme (cm -> birim)
-  geometry.computeBoundingBox(); // Güncel box
+  geometry.computeBoundingBox(); 
   const box = geometry.boundingBox;
   if (box) {
     const currentHeightUnits = box.max.y - box.min.y;
-    // Eğer obje çok küçükse veya boşsa hata vermemesi için kontrol
     if (currentHeightUnits > 0.1) {
         const targetHeightMM = targetHeightCM * 10; 
         const scaleFactor = targetHeightMM / currentHeightUnits;
@@ -299,7 +281,6 @@ export function generateVoxelGeometry(
 }
 
 export function exportToSTL(geometry: THREE.BufferGeometry): Blob {
-  // STL Export mantığı aynı kalacak
   const positions = geometry.attributes.position.array;
   const index = geometry.index ? geometry.index.array : null;
   const normals = geometry.attributes.normal.array;
@@ -318,7 +299,6 @@ export function exportToSTL(geometry: THREE.BufferGeometry): Blob {
     } else {
       idx1 = i * 3; idx2 = i * 3 + 1; idx3 = i * 3 + 2;
     }
-    // Normal ve Vertex verilerini yaz...
     view.setFloat32(offset, normals[idx1 * 3], true);
     view.setFloat32(offset + 4, normals[idx1 * 3 + 1], true);
     view.setFloat32(offset + 8, normals[idx1 * 3 + 2], true);

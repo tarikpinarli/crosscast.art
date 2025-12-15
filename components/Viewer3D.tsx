@@ -15,7 +15,7 @@ interface Viewer3DProps {
 const GalleryRoom = () => {
   const wallSize = 6000;    
   const wallDistance = 600; 
-  const floorLevel = -800;  
+  const floorLevel = -600;  
 
   const wallColor = "#afa095"; 
   const floorColor = "#334155"; 
@@ -57,7 +57,7 @@ const ArtisticMaterial = ({ isSmooth }: { isSmooth: boolean }) => {
   );
 };
 
-// --- KAMERA KONTROLCÜSÜ (GÜNCELLENDİ: Süzülerek Gitme) ---
+// --- KAMERA KONTROLCÜSÜ (Özgür Gezinme + Akıllı Süzülme) ---
 const CameraController = ({ 
   viewTrigger, 
   controlsRef,
@@ -68,14 +68,27 @@ const CameraController = ({
   geometry: THREE.BufferGeometry | null
 }) => {
   const { camera } = useThree();
-  const isFirstLoad = useRef(true);
-
-  // Kameranın gitmesi gereken hedef noktaları
-  // Varsayılan olarak Reset pozisyonuyla başlatıyoruz
+  
+  // Animasyon durumu
+  const isAnimating = useRef(false);
   const finalPosition = useRef(new THREE.Vector3(700, 400, 700));
   const finalTarget = useRef(new THREE.Vector3(0, 0, 0));
+  const isFirstLoad = useRef(true);
 
-  // 1. Hedef Belirleme (Butona basınca çalışır)
+  // 1. Mouse ile müdahale edilirse animasyonu durdur (ÖZGÜRLÜK)
+  useEffect(() => {
+     const controls = controlsRef.current;
+     if (!controls) return;
+
+     const stopAnimation = () => {
+        isAnimating.current = false;
+     };
+
+     controls.addEventListener('start', stopAnimation);
+     return () => controls.removeEventListener('start', stopAnimation);
+  }, [controlsRef]);
+
+  // 2. Butona basılınca hedefi güncelle ve animasyonu başlat
   useEffect(() => {
     if (!geometry || !controlsRef.current) return;
     
@@ -85,48 +98,62 @@ const CameraController = ({
     const center = new THREE.Vector3();
     box.getCenter(center);
     
-    // Odak noktası her zaman objenin merkezi
     finalTarget.current.copy(center);
 
-    if (isFirstLoad.current || viewTrigger) {
+    if (viewTrigger || isFirstLoad.current) {
+        
         if (viewTrigger?.type === 'front') {
-          finalPosition.current.set(0, 0, 800); 
+          finalPosition.current.set(0, 0, 400); 
         } 
         else if (viewTrigger?.type === 'side') {
-          finalPosition.current.set(800, 0, 0); 
+          finalPosition.current.set(400, 0, 0); 
         } 
         else {
-          // Reset View (Senin beğendiğin açı)
+          // Reset View (Beğendiğin açı)
           finalPosition.current.set(700, 400, 700); 
         }
-        
-        // İlk yüklemede animasyon olmasın, direkt gitsin
+
+        // İlk açılışta animasyonsuz git
         if (isFirstLoad.current) {
              camera.position.copy(finalPosition.current);
-             if (controlsRef.current) controlsRef.current.target.copy(finalTarget.current);
+             controlsRef.current.target.copy(finalTarget.current);
+             controlsRef.current.update();
              isFirstLoad.current = false;
+             isAnimating.current = false;
+        } else {
+             // Sonrasında animasyonla git
+             isAnimating.current = true;
         }
     }
   }, [viewTrigger, geometry, controlsRef, camera]);
 
-  // 2. Animasyon Döngüsü (Her karede %5 yaklaşır)
+  // 3. Süzülme Döngüsü
   useFrame(() => {
-     if (!controlsRef.current) return;
+     if (!controlsRef.current || !isAnimating.current) return;
 
-     // Kamerayı hedefe doğru süzdür (0.05 hızıyla)
-     camera.position.lerp(finalPosition.current, 0.05);
-     controlsRef.current.target.lerp(finalTarget.current, 0.05);
+     const distPos = camera.position.distanceTo(finalPosition.current);
+     const distTarget = controlsRef.current.target.distanceTo(finalTarget.current);
+
+     if (distPos < 0.1 && distTarget < 0.1) {
+         isAnimating.current = false;
+         camera.position.copy(finalPosition.current);
+         controlsRef.current.target.copy(finalTarget.current);
+         controlsRef.current.update();
+         return;
+     }
+
+     camera.position.lerp(finalPosition.current, 0.1);
+     controlsRef.current.target.lerp(finalTarget.current, 0.1);
      controlsRef.current.update();
   });
 
   return null;
 };
 
-// --- SAHNE İÇERİĞİ ---
+// --- SAHNE İÇERİĞİ (Karanlık Gölgeler, Parlak Işıklar) ---
 const SceneContent = ({ geometry, isSmooth, lightsOn }: { geometry: THREE.BufferGeometry, isSmooth: boolean, lightsOn: boolean }) => {
     const meshRef = useRef<THREE.Mesh>(null);
-    // Senin beğendiğin ışık şiddeti
-    const spotIntensity = 700000; 
+    const spotIntensity = 800000; 
 
     return (
         <>
@@ -136,11 +163,11 @@ const SceneContent = ({ geometry, isSmooth, lightsOn }: { geometry: THREE.Buffer
                 <ArtisticMaterial isSmooth={isSmooth} />
             </mesh>
 
-            {/* Senin beğendiğin ışık ayarları */}
-            <ambientLight intensity={lightsOn ? 0.4 : 0.8} />
+            {/* Projection modu açıkken ambient ışığı iyice kısıyoruz ki gölgeler siyah olsun */}
+            <ambientLight intensity={lightsOn ? 0.5 : 0.8} />
 
             <hemisphereLight 
-              intensity={0.1} 
+              intensity={lightsOn ? 0.05 : 0.4} 
               groundColor="#1a1a1a" 
               color="#ffffff"       
             />
