@@ -27,12 +27,35 @@ export const PaymentForm = ({ onSuccess, onCancel }: { onSuccess: () => void; on
   };
 
   return (
-    <form onSubmit={handleSubmit} className="mt-4">
-      <PaymentElement />
-      {msg && <div className="text-red-400 mt-2 text-sm">{msg}</div>}
-      <div className="flex gap-2 mt-4">
-        <button type="button" onClick={onCancel} className="flex-1 py-2 bg-slate-700 rounded text-sm">Cancel</button>
-        <button disabled={isLoading} className="flex-1 py-2 bg-indigo-600 rounded text-sm font-bold">
+    <form onSubmit={handleSubmit} className="mt-4 w-full">
+      {/* UPDATED: Added 'options' to hide address fields 
+         and force a cleaner layout 
+      */}
+      <PaymentElement 
+        options={{
+            layout: "tabs",
+            fields: {
+                billingDetails: {
+                    address: 'never' // This removes Country, Zip, and Address lines
+                }
+            }
+        }}
+      />
+      
+      {msg && <div className="text-red-400 mt-2 text-sm text-center">{msg}</div>}
+      
+      <div className="flex gap-3 mt-6">
+        <button 
+          type="button" 
+          onClick={onCancel} 
+          className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors"
+        >
+          Cancel
+        </button>
+        <button 
+          disabled={isLoading} 
+          className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-bold shadow-lg shadow-indigo-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        >
           {isLoading ? "Processing..." : "Pay $0.99"}
         </button>
       </div>

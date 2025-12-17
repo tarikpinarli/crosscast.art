@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Upload, Download, Settings, Box, Play, RefreshCw, Ruler, Activity, Grid as GridIcon, Zap, X, CreditCard, Lock } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Upload, Download, Play, RefreshCw, Ruler, Grid as GridIcon, Zap, X, Lock, Cpu, Layers, Activity, Sliders, Info, Ticket, CheckCircle, AlertCircle, HardDrive } from 'lucide-react';
 import { Viewer3D } from './components/Viewer3D';
 import { createMask, getAlignedImageData, generateVoxelGeometry, exportToSTL } from './utils/voxelEngine';
 import * as THREE from 'three';
@@ -9,28 +9,94 @@ import { loadStripe } from "@stripe/stripe-js";
 import { Elements } from "@stripe/react-stripe-js";
 import { PaymentForm } from './components/PaymentForm';
 
-// !!! IMPORTANT: REPLACE THIS WITH YOUR ACTUAL STRIPE PUBLISHABLE KEY (pk_test_...) !!!
+// REPLACE WITH YOUR KEY
 const stripePromise = loadStripe("pk_live_51SQbhxPxxqommwsY6g538an0Nbz8pskCfpH2xHV8Qk1gHzlIyim05DyxV4a870lAna8HP0McLoaDouK7O6XX0b2P0063byQlz1");
+
+// --- 💡 TOOLTIP COMPONENT ---
+const InfoTooltip = ({ text }: { text: string }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [wrapperRef]);
+
+  return (
+    <div ref={wrapperRef} className="relative ml-1.5 inline-flex items-center justify-center z-50">
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="focus:outline-none cursor-pointer p-1 -m-1"
+      >
+        <Info 
+          size={10} 
+          className={`transition-colors duration-200 ${isOpen ? 'text-cyan-400 drop-shadow-[0_0_5px_rgba(34,211,238,0.8)]' : 'text-zinc-600 hover:text-zinc-300'}`} 
+        />
+      </button>
+      
+      <div className={`
+          absolute bottom-full mb-2 w-48 p-3 
+          bg-black/95 border border-cyan-500/30 rounded-sm 
+          text-[10px] normal-case font-medium text-zinc-300 leading-relaxed
+          shadow-[0_0_20px_rgba(34,211,238,0.1)] backdrop-blur-xl 
+          left-1/2 -translate-x-1/2 z-50 text-center pointer-events-none
+          transition-all duration-200 ease-out
+          ${isOpen ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible translate-y-2'}
+      `}>
+         {text}
+         <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-cyan-500/30"></div>
+      </div>
+    </div>
+  );
+};
 
 export default function App() {
   const [imgA, setImgA] = useState<string | null>(null);
   const [imgB, setImgB] = useState<string | null>(null);
   const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [fileSize, setFileSize] = useState<string | null>(null); 
   
-  // Payment State
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [clientSecret, setClientSecret] = useState("");
+
+  const [couponInput, setCouponInput] = useState("");
+  const [couponMessage, setCouponMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
 
   // Parameters
   const [artisticMode, setArtisticMode] = useState(false);
   const [smoothingIterations, setSmoothingIterations] = useState(3);
   const [threshold, setThreshold] = useState(128);
   const [physicalHeight, setPhysicalHeight] = useState(10); 
-  const [gridSize, setGridSize] = useState(200);
-  
-  // Light Distance (30-160cm range)
+  // UPDATED: Default resolution set to 100px
+  const [gridSize, setGridSize] = useState(100); 
   const [lightDistance, setLightDistance] = useState(100); 
+
+  // Wake up server
+  useEffect(() => {
+    const wakeUpServer = async () => {
+      try { await fetch("https://shadow-sculpture-backend.onrender.com"); } catch (e) {}
+    };
+    wakeUpServer();
+  }, []);
+
+  // --- ⚠️ SAFETY: PREVENT ACCIDENTAL REFRESH ---
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (geometry) {
+        e.preventDefault();
+        e.returnValue = ''; // Chrome requires returnValue to be set
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [geometry]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, setImg: (s: string) => void) => {
     const file = e.target.files?.[0];
@@ -44,301 +110,324 @@ export default function App() {
   const processGeometry = useCallback(async () => {
     if (!imgA && !imgB) return;
     setIsProcessing(true);
-    
     await new Promise(r => setTimeout(r, 100));
-
     try {
       const [dataA, dataB] = await getAlignedImageData(imgA, imgB, gridSize);
-
       const maskA = dataA ? createMask(dataA, gridSize, threshold) : null;
       const maskB = dataB ? createMask(dataB, gridSize, threshold) : null;
-
       const geom = generateVoxelGeometry(maskA, maskB, artisticMode, smoothingIterations, physicalHeight, gridSize, lightDistance);
       
       setGeometry(geom);
+
+      if (geom) {
+          const triangleCount = geom.attributes.position.count / 3;
+          const bytes = 84 + (triangleCount * 50);
+          const megabytes = (bytes / (1024 * 1024)).toFixed(2);
+          setFileSize(`${megabytes} MB`);
+      }
+
     } catch (e) {
-      console.error("Geometry processing error:", e);
+      console.error("Error:", e);
     } finally {
       setIsProcessing(false);
     }
   }, [imgA, imgB, artisticMode, smoothingIterations, threshold, physicalHeight, gridSize, lightDistance]); 
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-        if(imgA || imgB) processGeometry();
-    }, 800);
+    const timer = setTimeout(() => { if(imgA || imgB) processGeometry(); }, 800);
     return () => clearTimeout(timer);
   }, [imgA, imgB, artisticMode, smoothingIterations, threshold, physicalHeight, gridSize, lightDistance, processGeometry]);
 
-  // --- 1. HANDLE EXPORT CLICK (Opens Modal & Talks to Server) ---
   const handleExportClick = async () => {
     if (!geometry) return;
-    setShowPaymentModal(true); // Open the modal immediately
-
-    // Connect to your local backend to get the payment ID
+    setCouponInput("");
+    setCouponMessage(null);
+    setShowPaymentModal(true);
     try {
         const res = await fetch("https://shadow-sculpture-backend.onrender.com/create-payment-intent", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
+            method: "POST", headers: { "Content-Type": "application/json" },
         });
         const data = await res.json();
         setClientSecret(data.clientSecret);
     } catch (error) {
-        console.error("Error connecting to server:", error);
-        alert("Could not connect to payment server. Make sure 'node server.js' is running!");
+        alert("Server connection error.");
     }
   };
 
-  // --- 2. HANDLE SUCCESS (Executes the Download) ---
+  const checkCoupon = () => {
+    if (couponInput === "003611") {
+        setCouponMessage({ type: 'success', text: "ACCESS GRANTED. BYPASSING PAYMENT..." });
+        setTimeout(() => {
+            handlePaymentSuccess();
+        }, 1500);
+    } else {
+        setCouponMessage({ type: 'error', text: "ACCESS DENIED: INVALID CODE" });
+    }
+  };
+
   const handlePaymentSuccess = () => {
     setShowPaymentModal(false);
-    setClientSecret(""); // Reset for next time
-
-    // This is your original download logic
+    setClientSecret("");
     if (!geometry) return;
     const blob = exportToSTL(geometry);
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `shadow-sculpture-${physicalHeight}cm-dist${lightDistance}cm.stl`;
+    link.download = `crosscast-model.stl`;
     link.click();
     URL.revokeObjectURL(url);
   };
 
-  // Stripe UI Theme Settings
   const appearance = {
     theme: 'night' as const,
-    labels: 'floating' as const,
-    variables: {
-      colorPrimary: '#6366f1',
-      colorBackground: '#1e293b',
-      colorText: '#f8fafc',
-    },
+    variables: { colorPrimary: '#ffffff', colorBackground: '#000000', colorText: '#e2e8f0', colorDanger: '#ff3333' },
   };
 
   return (
-    <div className="flex flex-col h-screen bg-slate-950 text-slate-200 font-sans relative">
-      <header className="flex items-center justify-between px-6 py-4 bg-slate-900 border-b border-slate-800">
-        <div className="flex items-center gap-2">
-          <Box className="w-8 h-8 text-indigo-500" />
-          <div>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-              ShadowSculpt
-            </h1>
-            <p className="text-xs text-slate-500">Perspective-Corrected Shadow Art</p>
+    <div className="flex flex-col h-screen bg-black text-zinc-300 font-sans tracking-tight selection:bg-cyan-500 selection:text-black overflow-hidden relative">
+      
+      {/* 🌌 ATMOSPHERE */}
+      <div className="absolute inset-0 z-0 opacity-30 pointer-events-none" 
+           style={{ backgroundImage: 'radial-gradient(circle at center, #ffffff 1.5px, transparent 1.5px)', backgroundSize: '60px 60px' }}>
+      </div>
+      <div className="absolute top-[-20%] left-[-10%] w-[50vw] h-[50vw] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none z-0 animate-pulse duration-[5000ms]"></div>
+      <div className="absolute bottom-[-20%] right-[-10%] w-[60vw] h-[60vw] bg-purple-600/15 rounded-full blur-[150px] pointer-events-none z-0 animate-pulse duration-[7000ms]"></div>
+      <div className="absolute top-[72px] left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-cyan-400/60 to-transparent z-20 shadow-[0_0_15px_rgba(34,211,238,0.6)]"></div>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.6)_100%)] pointer-events-none z-0"></div>
+
+      {/* HEADER */}
+      <header className="relative z-10 flex items-center justify-between px-8 py-5 bg-black/40 backdrop-blur-sm">
+        <div className="flex items-center gap-4 group cursor-default">
+          <div className="relative transition-transform group-hover:scale-110 duration-500">
+             <div className="absolute inset-0 bg-cyan-500/40 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+             <img src="/favicon.png" alt="Logo" className="relative w-11 h-11 object-contain opacity-90 invert-0" />
+          </div>
+          <div className="flex flex-col">
+            <h1 className="text-xl font-bold text-white tracking-widest uppercase drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">CrossCast</h1>
+            <span className="text-[9px] text-cyan-400/80 font-mono uppercase tracking-[0.2em]">Intersection Modeling Engine v1.0</span>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-           {/* UPDATED BUTTON: Calls handleExportClick instead of direct download */}
-           <button 
+        <button 
              onClick={handleExportClick}
              disabled={!geometry}
-             className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-md text-sm font-medium transition-colors shadow-lg shadow-indigo-500/20"
+             className="group relative px-6 py-2 bg-white text-black text-xs font-bold uppercase tracking-wider hover:bg-cyan-50 disabled:bg-zinc-800 disabled:text-zinc-600 transition-all rounded-sm shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_30px_rgba(34,211,238,0.5)]"
            >
-             <Download size={16} /> Export STL
-           </button>
-        </div>
+             Export .STL
+        </button>
       </header>
 
-      <main className="flex-1 flex overflow-hidden">
-        <aside className="w-96 flex-shrink-0 bg-slate-900 border-r border-slate-800 p-6 overflow-y-auto custom-scrollbar">
-          
-          <div className="mb-6 pb-4 border-b border-slate-800">
-             <h2 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
-               <Upload size={16} className="text-indigo-400"/> Source Images
+      <main className="relative z-10 flex-1 flex overflow-hidden">
+        
+        {/* SIDEBAR */}
+        <aside className="w-80 flex-shrink-0 bg-black/60 backdrop-blur-xl border-r border-white/10 p-6 overflow-y-auto custom-scrollbar flex flex-col gap-8 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-[1px] h-full bg-gradient-to-b from-transparent via-white/10 to-transparent opacity-50"></div>
+
+          {/* UPLOAD SECTION */}
+          <div>
+             <h2 className="text-[10px] text-zinc-400 font-mono uppercase mb-4 flex items-center gap-2">
+               <Layers size={10} className="text-cyan-400"/> Input Silhouettes
              </h2>
-             <p className="text-xs text-slate-500 mt-1">Upload silhouettes for front and side views.</p>
+             
+             <div className="grid grid-cols-2 gap-3">
+                {/* INPUT A */}
+                <label className={`
+                    group relative h-28 border transition-all duration-500 cursor-pointer flex flex-col items-center justify-center overflow-hidden
+                    ${imgA 
+                      ? 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.2)] bg-zinc-900/40' 
+                      : 'border-cyan-500/30 bg-cyan-950/10 shadow-[inset_0_0_20px_rgba(34,211,238,0.1)] animate-[pulse_3000ms_ease-in-out_infinite] hover:border-cyan-500/60 hover:bg-cyan-900/20'
+                    }
+                `}>
+                    <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, setImgA)} className="hidden" />
+                    {imgA ? (
+                        <img src={imgA} className="h-full w-full object-contain p-2 opacity-80 group-hover:opacity-100 transition-opacity" /> 
+                    ) : (
+                        <>
+                           <div className="absolute inset-0 bg-gradient-to-t from-cyan-500/10 to-transparent opacity-50"></div>
+                           <span className="text-[10px] text-zinc-500 group-hover:text-cyan-200 transition-colors uppercase z-10 font-bold tracking-widest">Front View</span>
+                           <Upload size={16} className="mt-2 text-cyan-500/40 group-hover:text-cyan-400 transition-colors z-10" />
+                        </>
+                    )}
+                </label>
+
+                {/* INPUT B */}
+                <label className={`
+                    group relative h-28 border transition-all duration-500 cursor-pointer flex flex-col items-center justify-center overflow-hidden
+                    ${imgB 
+                      ? 'border-purple-400 shadow-[0_0_15px_rgba(192,132,252,0.2)] bg-zinc-900/40' 
+                      : 'border-purple-500/30 bg-purple-950/10 shadow-[inset_0_0_20px_rgba(168,85,247,0.1)] animate-[pulse_3000ms_ease-in-out_infinite] hover:border-purple-500/60 hover:bg-purple-900/20'
+                    }
+                `}>
+                    <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, setImgB)} className="hidden" />
+                    {imgB ? (
+                        <img src={imgB} className="h-full w-full object-contain p-2 opacity-80 group-hover:opacity-100 transition-opacity" /> 
+                    ) : (
+                        <>
+                           <div className="absolute inset-0 bg-gradient-to-t from-purple-500/10 to-transparent opacity-50"></div>
+                           <span className="text-[10px] text-zinc-500 group-hover:text-purple-200 transition-colors uppercase z-10 font-bold tracking-widest">Side View</span>
+                           <Upload size={16} className="mt-2 text-purple-500/40 group-hover:text-purple-400 transition-colors z-10" />
+                        </>
+                    )}
+                </label>
+             </div>
           </div>
 
-          <div className="space-y-8">
-            {/* INPUT A */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                Front Silhouette (Z-Axis)
-              </label>
-               <div className="relative group">
-                 <input 
-                   type="file" 
-                   accept="image/*" 
-                   onChange={(e) => handleFileUpload(e, setImgA)}
-                   className="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-slate-800 file:text-indigo-400 hover:file:bg-slate-700 cursor-pointer"
-                 />
-               </div>
-              <div className="w-full h-32 bg-slate-800/50 rounded-lg border-2 border-dashed border-slate-700 flex items-center justify-center overflow-hidden relative">
-                {imgA ? (
-                  <img src={imgA} alt="Front" className="h-full object-contain" />
-                ) : (
-                  <span className="text-xs text-slate-600">No Image Selected</span>
-                )}
-                {imgA && <button onClick={() => setImgA(null)} className="absolute top-1 right-1 bg-black/50 p-1 rounded-full text-white/70 hover:text-white">&times;</button>}
-              </div>
-            </div>
-
-            {/* INPUT B */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-red-500"></span>
-                Side Silhouette (X-Axis)
-              </label>
-               <input 
-                 type="file" 
-                 accept="image/*" 
-                 onChange={(e) => handleFileUpload(e, setImgB)}
-                 className="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-slate-800 file:text-indigo-400 hover:file:bg-slate-700 cursor-pointer"
-               />
-               <div className="w-full h-32 bg-slate-800/50 rounded-lg border-2 border-dashed border-slate-700 flex items-center justify-center overflow-hidden relative">
-                {imgB ? (
-                  <img src={imgB} alt="Side" className="h-full object-contain" />
-                ) : (
-                  <span className="text-xs text-slate-600">No Image Selected</span>
-                )}
-                {imgB && <button onClick={() => setImgB(null)} className="absolute top-1 right-1 bg-black/50 p-1 rounded-full text-white/70 hover:text-white">&times;</button>}
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-slate-800 space-y-5">
-               <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-slate-400 flex items-center gap-2">
-                    <Settings size={14} /> Algorithm Settings
-                  </h3>
-               </div>
+          {/* CONTROLS SECTION */}
+          <div className="space-y-6">
+               <h2 className="text-[10px] text-zinc-400 font-mono uppercase flex items-center gap-2">
+                 <Cpu size={10} className="text-cyan-400" /> Parameter Config
+               </h2>
                
-               {/* LIGHT DISTANCE SLIDER */}
-               <div className="space-y-1 bg-indigo-900/20 p-3 rounded-md border border-indigo-500/30">
-                 <div className="flex justify-between text-xs text-slate-300 mb-1">
-                    <span className="flex items-center gap-1 font-semibold text-indigo-300"><Zap size={12}/> Light Distance</span>
-                    <span className="text-indigo-400 font-bold font-mono">{lightDistance} cm</span>
+               {/* SLIDERS SECTION */}
+               <div className="space-y-6">
+                 <div className="group">
+                    <div className="flex justify-between text-[10px] uppercase font-bold text-zinc-500 mb-2 group-hover:text-cyan-300 transition-colors">
+                        <span className="flex items-center gap-1"><Zap size={10}/> Light Distance <InfoTooltip text="Distance from your light source to the sculpture. Affects shadow distortion." /></span>
+                        <span className="font-mono text-white">{lightDistance} cm</span>
+                    </div>
+                    <input type="range" min="30" max="160" step="5" value={lightDistance} onChange={(e) => setLightDistance(Number(e.target.value))} className="w-full h-[2px] bg-zinc-800 appearance-none cursor-pointer accent-white hover:accent-cyan-400 shadow-[0_0_10px_rgba(255,255,255,0.2)]"/>
                  </div>
-                 <input 
-                    type="range" min="30" max="160" step="5" value={lightDistance} 
-                    onChange={(e) => setLightDistance(Number(e.target.value))}
-                    className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                 />
-                 <p className="text-[10px] text-indigo-400/60 mt-1">
-                    Distance from sculpture to flashlight.
-                 </p>
-               </div>
-
-               <div className="space-y-1">
-                 <div className="flex justify-between text-xs text-slate-500">
-                    <span>Threshold</span>
-                    <span>{threshold}</span>
+                 <div className="group">
+                    <div className="flex justify-between text-[10px] uppercase font-bold text-zinc-500 mb-2 group-hover:text-cyan-300 transition-colors">
+                        <span className="flex items-center gap-1"><GridIcon size={10}/> Resolution <InfoTooltip text="Voxel grid density. Higher values = sharper details but slower processing." /></span>
+                        <span className="font-mono text-white">{gridSize} px</span>
+                    </div>
+                    {/* UPDATED: Min 50, Max 250 */}
+                    <input type="range" min="50" max="250" step="10" value={gridSize} onChange={(e) => setGridSize(Number(e.target.value))} className="w-full h-[2px] bg-zinc-800 appearance-none cursor-pointer accent-white hover:accent-cyan-400 shadow-[0_0_10px_rgba(255,255,255,0.2)]"/>
                  </div>
-                 <input 
-                    type="range" min="0" max="255" value={threshold} 
-                    onChange={(e) => setThreshold(Number(e.target.value))}
-                    className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                 />
+                 <div className="group">
+                    <div className="flex justify-between text-[10px] uppercase font-bold text-zinc-500 mb-2 group-hover:text-cyan-300 transition-colors">
+                        <span className="flex items-center gap-1"><Ruler size={10}/> Height <InfoTooltip text="Target physical height for 3D printing. Adjusts the model scale." /></span>
+                        <span className="font-mono text-white">{physicalHeight} cm</span>
+                    </div>
+                    <input type="range" min="5" max="40" step="1" value={physicalHeight} onChange={(e) => setPhysicalHeight(Number(e.target.value))} className="w-full h-[2px] bg-zinc-800 appearance-none cursor-pointer accent-white hover:accent-cyan-400 shadow-[0_0_10px_rgba(255,255,255,0.2)]"/>
+                 </div>
+                 <div className="group">
+                    <div className="flex justify-between text-[10px] uppercase font-bold text-zinc-500 mb-2 group-hover:text-cyan-300 transition-colors">
+                        <span className="flex items-center gap-1"><Sliders size={10}/> Threshold <InfoTooltip text="Image contrast cutoff. Increase if background noise appears in the model." /></span>
+                        <span className="font-mono text-white">{threshold}</span>
+                    </div>
+                    <input type="range" min="0" max="255" value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} className="w-full h-[2px] bg-zinc-800 appearance-none cursor-pointer accent-white hover:accent-cyan-400 shadow-[0_0_10px_rgba(255,255,255,0.2)]"/>
+                 </div>
+                 <div className="group">
+                    <div className="flex justify-between text-[10px] uppercase font-bold text-zinc-500 mb-2 group-hover:text-cyan-300 transition-colors">
+                        <span className="flex items-center gap-1"><Activity size={10}/> Smoothness <InfoTooltip text="Number of smoothing passes. Removes 'staircase' artifacts from voxels." /></span>
+                        <span className="font-mono text-white">{smoothingIterations}x</span>
+                    </div>
+                    <input type="range" min="0" max="8" step="1" value={smoothingIterations} onChange={(e) => setSmoothingIterations(Number(e.target.value))} className="w-full h-[2px] bg-zinc-800 appearance-none cursor-pointer accent-white hover:accent-cyan-400 shadow-[0_0_10px_rgba(255,255,255,0.2)]"/>
+                 </div>
                </div>
-
-               <div className="space-y-1">
-                 <div className="flex justify-between text-xs text-slate-500">
-                    <span className="flex items-center gap-1"><GridIcon size={12}/> Resolution</span>
-                    <span className={`font-mono font-bold ${gridSize > 200 ? 'text-red-400' : 'text-indigo-400'}`}>
-                      {gridSize}px
+                
+               <label className="flex items-center gap-3 cursor-pointer group pt-4 border-t border-white/5">
+                    <div className={`w-3 h-3 border border-zinc-600 ${artisticMode ? 'bg-cyan-500 border-cyan-500' : 'bg-transparent'} transition-colors shadow-[0_0_10px_rgba(34,211,238,0.4)]`}></div>
+                    <input type="checkbox" checked={artisticMode} onChange={(e) => setArtisticMode(e.target.checked)} className="hidden" />
+                    <span className="text-[10px] uppercase font-bold text-zinc-500 group-hover:text-white transition-colors flex items-center">
+                      Artistic Debris Mode <InfoTooltip text="Allows floating parts. Good for abstract art, but harder to 3D print." />
                     </span>
-                 </div>
-                 <input 
-                    type="range" 
-                    min="100" 
-                    max="250" 
-                    step="10"
-                    value={gridSize} 
-                    onChange={(e) => setGridSize(Number(e.target.value))}
-                    className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                 />
-               </div>
+               </label>
 
-               <div className="space-y-1">
-                 <div className="flex justify-between text-xs text-slate-500">
-                    <span className="flex items-center gap-1"><Activity size={12}/> Smoothness</span>
-                    <span className="text-indigo-400 font-mono">{smoothingIterations}x</span>
-                 </div>
-                 <input 
-                    type="range" 
-                    min="0" 
-                    max="8" 
-                    step="1"
-                    value={smoothingIterations} 
-                    onChange={(e) => setSmoothingIterations(Number(e.target.value))}
-                    className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                 />
-               </div>
-
-               <div className="space-y-1 bg-slate-800/50 p-3 rounded-md border border-slate-800">
-                 <div className="flex justify-between text-xs text-slate-400 mb-1">
-                    <span className="flex items-center gap-1"><Ruler size={12}/> Target Height</span>
-                    <span className="text-indigo-400 font-bold font-mono">{physicalHeight} cm</span>
-                 </div>
-                 <input 
-                    type="range" min="5" max="40" step="1" value={physicalHeight} 
-                    onChange={(e) => setPhysicalHeight(Number(e.target.value))}
-                    className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                 />
-               </div>
-
-               <div className="flex items-center gap-3">
-                  <input 
-                  type="checkbox" id="artistic" checked={artisticMode} 
-                  onChange={(e) => setArtisticMode(e.target.checked)}
-                  className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900" 
-                  />
-                  <label htmlFor="artistic" className="text-sm text-slate-300 select-none cursor-pointer">
-                  Artistic "Debris" Mode
-                  </label>
-               </div>
-            </div>
-            
-             <button 
-               onClick={processGeometry} 
-               disabled={isProcessing}
-               className="w-full py-3 mt-4 bg-slate-800 hover:bg-slate-700 text-indigo-300 font-semibold rounded-lg flex items-center justify-center gap-2 transition-colors border border-slate-700"
-             >
-               {isProcessing ? <RefreshCw className="animate-spin" /> : <Play size={16} fill="currentColor" />}
-               {isProcessing ? "Processing..." : "Regenerate Mesh"}
-             </button>
-
+               <button onClick={processGeometry} disabled={isProcessing} className="w-full py-3 mt-4 border border-white/10 hover:border-cyan-500/50 bg-white/5 hover:bg-cyan-500/10 text-white text-xs font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-[0_0_0px_rgba(0,0,0,0)] hover:shadow-[0_0_20px_rgba(34,211,238,0.2)]">
+                {isProcessing ? <RefreshCw className="animate-spin" size={14} /> : <Play size={14} fill="currentColor" />}
+                {isProcessing ? "PROCESSING" : "GENERATE MESH"}
+               </button>
           </div>
         </aside>
 
-        <section className="flex-1 p-6 flex flex-col gap-4 bg-slate-950 relative">
-           <Viewer3D geometry={geometry} showGrid={true} isSmooth={smoothingIterations > 0} lightDistanceCM={lightDistance} />
+        {/* VIEWER AREA */}
+        <section className="flex-1 relative bg-black/80">
+           <div className="absolute inset-0 pointer-events-none opacity-20" style={{backgroundImage: 'linear-gradient(rgba(34,211,238,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(34,211,238,0.1) 1px, transparent 1px)', backgroundSize: '100px 100px'}}></div>
+           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-cyan-500/5 rounded-full blur-[120px] pointer-events-none"></div>
+           <Viewer3D geometry={geometry} showGrid={true} isSmooth={smoothingIterations > 0} lightDistanceCM={lightDistance} isProcessing={isProcessing}/>
         </section>
       </main>
 
-      {/* --- STRIPE PAYMENT MODAL --- */}
+      {/* --- PAYMENT MODAL: SCROLLABLE FIX & CUSTOM SCROLLBAR --- */}
       {showPaymentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden relative">
-                <button 
-                    onClick={() => setShowPaymentModal(false)}
-                    className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors z-10"
-                >
-                    <X size={20} />
-                </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-[2px] p-4 transition-opacity duration-300">
+            <div className="relative w-full max-w-sm max-h-[90vh] overflow-y-auto bg-black border border-white/10 shadow-[0_0_50px_rgba(34,211,238,0.15)] animate-in fade-in zoom-in-95 duration-200 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-black [&::-webkit-scrollbar-thumb]:bg-zinc-800 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-cyan-500">
                 
-                <div className="p-8 flex flex-col items-center">
-                    <div className="w-12 h-12 bg-indigo-500/10 rounded-full flex items-center justify-center mb-4 ring-1 ring-indigo-500/30">
-                        <Download className="w-6 h-6 text-indigo-400" />
+                {/* Sticky Close Button */}
+                <div className="sticky top-0 right-0 z-50 flex justify-end p-4 pointer-events-none">
+                    <button 
+                        onClick={() => setShowPaymentModal(false)} 
+                        className="pointer-events-auto bg-black/50 backdrop-blur-md rounded-full p-1 text-zinc-500 hover:text-white transition-colors border border-white/10 hover:border-white/30"
+                    >
+                        <X size={16} />
+                    </button>
+                </div>
+                
+                {/* Content Container */}
+                <div className="px-8 pb-8 -mt-12">
+                    <div className="flex items-center gap-4 mb-6 mt-4">
+                        <div className="w-10 h-10 bg-cyan-950/30 border border-cyan-500/30 text-cyan-400 flex items-center justify-center shadow-[0_0_15px_rgba(34,211,238,0.2)] rounded-sm">
+                            <Download size={18} />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold text-white uppercase tracking-wider">Export STL</h3>
+                            <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Secure Transfer</p>
+                        </div>
                     </div>
                     
-                    <h3 className="text-xl font-bold text-white mb-1">Export STL File</h3>
-                    <p className="text-slate-400 mb-6 text-sm">Total: <span className="text-white font-bold">$0.99</span></p>
-
-                    {clientSecret ? (
-                        <Elements options={{ clientSecret, appearance }} stripe={stripePromise}>
-                            <PaymentForm onSuccess={handlePaymentSuccess} onCancel={() => setShowPaymentModal(false)} />
-                        </Elements>
-                    ) : (
-                        <div className="flex flex-col items-center justify-center py-8 text-slate-500">
-                            <RefreshCw className="animate-spin mb-2" />
-                            <span className="text-sm">Initializing Secure Payment...</span>
+                    <div className="mb-6 border-l-2 border-cyan-500 pl-4 py-1 bg-gradient-to-r from-cyan-950/20 to-transparent flex justify-between items-center pr-2">
+                        <div>
+                            <p className="text-[10px] text-zinc-400 uppercase tracking-widest mb-0.5">Transaction Fee</p>
+                            <p className="text-2xl font-mono text-white tracking-tight">$0.99</p>
                         </div>
-                    )}
+                        {/* Removed File Size Display from Modal as requested */}
+                    </div>
+
+                    {/* COUPON SECTION */}
+                    <div className="mb-6 p-3 bg-zinc-900/30 border border-white/5 rounded-sm">
+                        <label className="flex items-center gap-2 text-[9px] text-zinc-500 uppercase tracking-widest mb-2 font-bold">
+                           <Ticket size={10} className="text-cyan-500"/> Promo Code
+                        </label>
+                        <div className="flex gap-2">
+                           <input 
+                              type="text" 
+                              value={couponInput}
+                              onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                              placeholder="000-000"
+                              className="flex-1 bg-black border border-zinc-800 text-white text-xs font-mono px-3 py-2 focus:border-cyan-500 focus:outline-none uppercase placeholder-zinc-800 transition-colors"
+                           />
+                           <button 
+                             onClick={checkCoupon}
+                             className="bg-zinc-800 hover:bg-cyan-600 hover:text-white text-cyan-500 border border-zinc-700 hover:border-cyan-400 px-3 py-2 text-[10px] font-bold uppercase tracking-wider transition-all"
+                           >
+                             Apply
+                           </button>
+                        </div>
+                        {couponMessage && (
+                            <div className={`mt-2 flex items-center gap-2 text-[10px] font-mono ${couponMessage.type === 'success' ? 'text-green-400' : 'text-red-400'}`}>
+                                {couponMessage.type === 'success' ? <CheckCircle size={12} /> : <AlertCircle size={12} />}
+                                <span className="animate-pulse">{couponMessage.text}</span>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex items-center gap-4 my-6 opacity-50">
+                        <div className="h-px bg-zinc-800 flex-1"></div>
+                        <span className="text-[9px] text-zinc-600 uppercase tracking-widest">Encrypted Checkout</span>
+                        <div className="h-px bg-zinc-800 flex-1"></div>
+                    </div>
+
+                    {/* STRIPE ELEMENT */}
+                    <div className="min-h-[160px] relative">
+                        {clientSecret ? (
+                            <Elements options={{ clientSecret, appearance }} stripe={stripePromise}>
+                                <PaymentForm onSuccess={handlePaymentSuccess} onCancel={() => setShowPaymentModal(false)} />
+                            </Elements>
+                        ) : (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-zinc-600 animate-pulse">
+                                <RefreshCw className="animate-spin text-cyan-500/50" size={24} />
+                                <div className="text-center">
+                                    <p className="text-[10px] font-mono uppercase tracking-widest text-cyan-500/80">Establishing Uplink...</p>
+                                    <p className="text-[9px] text-zinc-700 mt-1">Handshaking with Secure Gateway</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                     
-                    <div className="mt-6 flex items-center gap-2 text-xs text-slate-500">
-                        <Lock size={12} /> <span>Secure Encrypted Payment</span>
+                    <div className="mt-4 flex justify-center items-center gap-2 text-[9px] text-zinc-700 uppercase font-mono pt-3 border-t border-white/5">
+                        <Lock size={10} /> <span>TLS 1.3 Encrypted Connection</span>
                     </div>
                 </div>
             </div>
@@ -347,4 +436,3 @@ export default function App() {
     </div>
   );
 }
-// Force Vercel Rebuild
