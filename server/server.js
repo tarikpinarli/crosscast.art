@@ -24,3 +24,43 @@ app.post('/create-payment-intent', async (req, res) => {
 });
 
 app.listen(4242, () => console.log('Server running on port 4242'));
+
+// --- MESHY AI PROXY ---
+// Add MESHY_API_KEY to your Render Environment Variables!
+
+const MESHY_API_KEY = process.env.MESHY_API_KEY; 
+
+// 1. Create Task
+app.post('/api/meshy/create', async (req, res) => {
+  try {
+    const response = await fetch("https://api.meshy.ai/openapi/v1/image-to-3d", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${MESHY_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(req.body)
+    });
+    
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Meshy API Error");
+    res.json(data);
+  } catch (error) {
+    console.error("Meshy Create Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 2. Check Status (Polling)
+app.get('/api/meshy/status/:id', async (req, res) => {
+  try {
+    const response = await fetch(`https://api.meshy.ai/openapi/v1/image-to-3d/${req.params.id}`, {
+      headers: { "Authorization": `Bearer ${MESHY_API_KEY}` }
+    });
+    
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
