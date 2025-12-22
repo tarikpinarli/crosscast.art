@@ -7,24 +7,36 @@ export const PaymentForm = ({ onSuccess, onCancel }: { onSuccess: () => void; on
   const [msg, setMsg] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!stripe || !elements) return;
-    setIsLoading(true);
+// src/components/PaymentForm.tsx
 
-    const { error, paymentIntent } = await stripe.confirmPayment({
-      elements,
-      redirect: "if_required",
-    });
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!stripe || !elements) return;
+  setIsLoading(true);
 
-    if (error) {
-      setMsg(error.message || "Error");
-      setIsLoading(false);
-    } else if (paymentIntent && paymentIntent.status === "succeeded") {
-      setMsg("Success!");
-      setTimeout(onSuccess, 1000);
+  const { error, paymentIntent } = await stripe.confirmPayment({
+    elements,
+    redirect: "if_required",
+    confirmParams: {
+      // FIX: When address element is hidden, we MUST provide a country
+      payment_method_data: {
+        billing_details: {
+          address: {
+            country: 'US', // Or your default country code
+          }
+        }
+      }
     }
-  };
+  });
+
+  if (error) {
+    setMsg(error.message || "Error");
+    setIsLoading(false);
+  } else if (paymentIntent && paymentIntent.status === "succeeded") {
+    setMsg("Success!");
+    setTimeout(onSuccess, 1000);
+  }
+};
 
   return (
     <form onSubmit={handleSubmit} className="mt-4 w-full">
