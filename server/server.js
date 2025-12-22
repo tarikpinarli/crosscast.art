@@ -9,6 +9,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// ✅ ADD THIS: A simple route for the root path
+app.get('/', (req, res) => {
+  res.send('Server is running');
+});
+
 app.post('/create-payment-intent', async (req, res) => {
   try {
     const paymentIntent = await stripe.paymentIntents.create({
