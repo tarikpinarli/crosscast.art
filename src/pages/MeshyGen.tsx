@@ -10,8 +10,7 @@ import { Elements } from "@stripe/react-stripe-js";
 import { PaymentForm } from '../components/PaymentForm';
 
 // 👇 REPLACE WITH YOUR PUBLIC KEY
-const stripePromise = loadStripe("pk_live_51SQbhxPxxqommwsY6g538an0Nbz8pskCfpH2xHV8Qk1gHzlIyim05DyxV4a870lAna8HP0McLoaDouK7O6XX0b2P0063byQlz1");
-
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 // --- 💡 TOOLTIP COMPONENT ---
 const InfoTooltip = ({ text }: { text: string }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -110,7 +109,9 @@ export default function MeshyGen() {
     try {
         // Request Payment Setup (This checks backend inventory first!)
         const res = await fetch("https://shadow-sculpture-backend.onrender.com/create-payment-intent", {
-            method: "POST", headers: { "Content-Type": "application/json" },
+            method: "POST", 
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ product: 'meshy' }) // <--- CRITICAL: Sets price to $1.99
         });
         
         const data = await res.json();

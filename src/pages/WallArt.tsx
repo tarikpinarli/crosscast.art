@@ -11,8 +11,8 @@ import { Elements } from "@stripe/react-stripe-js";
 import { PaymentForm } from '../components/PaymentForm';
 
 // REPLACE WITH YOUR KEY
-const stripePromise = loadStripe("pk_live_51SQbhxPxxqommwsY6g538an0Nbz8pskCfpH2xHV8Qk1gHzlIyim05DyxV4a870lAna8HP0McLoaDouK7O6XX0b2P0063byQlz1");
-
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+console.log("MY KEY:", import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY); // Check Console
 // --- 💡 TOOLTIP COMPONENT ---
 const InfoTooltip = ({ text }: { text: string }) => {
   const [isOpen, setIsOpen] = useState(false);

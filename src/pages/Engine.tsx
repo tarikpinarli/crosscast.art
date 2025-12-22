@@ -10,7 +10,8 @@ import { Elements } from "@stripe/react-stripe-js";
 import { PaymentForm } from '../components/PaymentForm';
 
 // REPLACE WITH YOUR KEY
-const stripePromise = loadStripe("pk_live_51SQbhxPxxqommwsY6g538an0Nbz8pskCfpH2xHV8Qk1gHzlIyim05DyxV4a870lAna8HP0McLoaDouK7O6XX0b2P0063byQlz1");
+console.log("🔑 STRIPE KEY IS:", import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 // --- 💡 TOOLTIP COMPONENT ---
 const InfoTooltip = ({ text }: { text: string }) => {
