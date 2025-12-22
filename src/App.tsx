@@ -10,7 +10,7 @@ import { Elements } from "@stripe/react-stripe-js";
 import { PaymentForm } from './components/PaymentForm';
 
 // REPLACE WITH YOUR KEY
-const stripePromise = loadStripe("pk_live_51SQbhxPxxqommwsY6g538an0Nbz8pskCfpH2xHV8Qk1gHzlIyim05DyxV4a870lAna8HP0McLoaDouK7O6XX0b2P0063byQlz1");
+const stripePromise = loadStripe("pk_test_51SQbhxPxxqommwsYtjFccQn2VNOLtYZbxS3i8T25TlJF50nf6SuJw7aJg6Sst86xCqTVEKOJnQ7j4tmuOOrdU6NV00WXm5dzaN");
 
 // --- 💡 TOOLTIP COMPONENT ---
 const InfoTooltip = ({ text }: { text: string }) => {
