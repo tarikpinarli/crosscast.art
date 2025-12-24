@@ -22,6 +22,7 @@
     "polygon-clipping": "^0.15.7",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
+    "react-map-gl": "^8.1.0",
     "react-router-dom": "^7.11.0",
     "three": "^0.182.0",
     "three-geo": "^1.4.5",

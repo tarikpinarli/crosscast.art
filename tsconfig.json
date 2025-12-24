@@ -19,11 +19,15 @@
     "moduleDetection": "force",
     "allowJs": true,
     "jsx": "react-jsx",
+    
+    /* --- THIS IS THE FIX --- */
+    "baseUrl": ".", 
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"],
+      "react-map-gl": ["./node_modules/react-map-gl/dist/mapbox.d.ts"]
     },
+    /* ----------------------- */
+
     "allowImportingTsExtensions": true,
     "noEmit": true
   }
