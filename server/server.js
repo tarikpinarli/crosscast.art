@@ -11,9 +11,10 @@ app.use(express.json());
 // 1. Define Module Prices (Server-Side Source of Truth)
 const MODULE_PRICES = {
   'intersection-basic': 99,   // $0.99
-  'wall-art-basic': 299,      // $2.99 (Example for future module)
-  'pro-suite': 1499           // $14.99
+  'wall-art-basic': 99,      // $2.99 (Example for future module)
+  'geo-sculptor-basic': 199 // $2.50
 };
+
 
 app.get('/', (req, res) => res.send('CrossCast API Online'));
 

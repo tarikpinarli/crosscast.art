@@ -8,7 +8,7 @@ import { CyberSlider } from '../../components/ui/CyberSlider';
 import { PaymentModal } from '../../components/PaymentModal';
 import { usePayment } from '../../hooks/usePayment';
 import { GeoView } from './GeoView';
-import { MapSelector, MapSelectorRef } from './MapSelector'; // Import the ref type
+import { MapSelector, MapSelectorRef } from './MapSelector';
 import { fetchTerrainGeometry, fetchBuildingsGeometry } from '../../utils/geoEngine';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
@@ -71,7 +71,9 @@ const SidebarSearch = ({ onSelect }: { onSelect: (lat: number, lon: number) => v
 };
 
 export default function GeoSculptorModule() {
+  // 1. PAYMENT HOOK
   const { showModal, clientSecret, startCheckout, closeModal } = usePayment('geo-sculptor-basic');
+  
   const mapRef = useRef<MapSelectorRef>(null);
 
   // --- STATE ---
@@ -80,27 +82,29 @@ export default function GeoSculptorModule() {
   const [status, setStatus] = useState<string>(""); 
   const [isProcessing, setIsProcessing] = useState(false);
   const [coords, setCoords] = useState<{lat: number, lon: number, zoom: number, radius: number} | null>(null);
+  
+  // Params
   const [isCityMode, setIsCityMode] = useState(true); 
   const [exaggeration, setExaggeration] = useState(1.0); 
 
-  // --- LOGIC ---
-  
-  // 1. Triggered by the "Capture Area" button in sidebar
+  // --- ACTIONS ---
+
+  // Trigger from "Capture Area" button
   const triggerCapture = () => {
       if (mapRef.current) {
           const selection = mapRef.current.getSelection();
-          handleMapConfirm(selection);
+          if (selection) {
+              handleMapConfirm(selection);
+          }
       }
   };
 
-  // 2. Main Generation Handler
   const handleMapConfirm = async (selectedCoords: { lat: number, lon: number, zoom: number, radius: number }) => {
       setCoords(selectedCoords);
       setMode('VIEW');
       generateModel(selectedCoords, isCityMode, exaggeration);
   };
 
-  // 3. Generation Logic
   const generateModel = async (
       c: {lat:number, lon:number, radius: number}, 
       cityMode: boolean, 
@@ -108,14 +112,14 @@ export default function GeoSculptorModule() {
   ) => {
       setIsProcessing(true);
       setModelData(null); 
-      setStatus("Initializing...");
+      setStatus("Initializing Satellite Data...");
 
       try {
           let result;
           if (cityMode) {
              result = await fetchBuildingsGeometry(c.lat, c.lon, c.radius, setStatus);
           } else {
-             setStatus("Fetching Terrain Map...");
+             setStatus("Fetching Digital Elevation Model...");
              result = await fetchTerrainGeometry(c.lat, c.lon, 12, exagg);
           }
           setModelData(result);
@@ -129,28 +133,45 @@ export default function GeoSculptorModule() {
       }
   };
 
-  // 4. Re-generate on Slider Change
+  // Re-generate on Slider Change (Debounced)
   useEffect(() => {
      if (mode === 'VIEW' && coords) {
-         const timer = setTimeout(() => generateModel(coords, isCityMode, exaggeration), 500);
+         const timer = setTimeout(() => generateModel(coords, isCityMode, exaggeration), 800);
          return () => clearTimeout(timer);
      }
   }, [exaggeration, isCityMode]); 
 
-  // 5. Download Logic
+  // --- 2. EXPORT LOGIC (Connected to Payment Success) ---
   const handleDownload = () => {
     if (!modelData) return;
-    const group = new THREE.Group();
-    if (modelData.base) group.add(new THREE.Mesh(modelData.base));
-    if (modelData.buildings) group.add(new THREE.Mesh(modelData.buildings));
     
+    // Create a temporary group to hold both parts for a single export
+    const group = new THREE.Group();
+    
+    // Add Base
+    if (modelData.base) {
+        const baseMesh = new THREE.Mesh(modelData.base);
+        group.add(baseMesh);
+    }
+    
+    // Add Buildings
+    if (modelData.buildings) {
+        const buildingMesh = new THREE.Mesh(modelData.buildings);
+        group.add(buildingMesh);
+    }
+
     const exporter = new STLExporter();
-    const result = exporter.parse(group);
+    const result = exporter.parse(group); // Exports the whole group as one STL
+    
+    // Trigger Browser Download
     const blob = new Blob([result], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `geo_export.stl`; 
+    link.href = url;
+    link.download = `geo_sculptor_${Date.now()}.stl`; 
     link.click();
+    
+    // Clean up
     closeModal();
   };
 
@@ -160,12 +181,13 @@ export default function GeoSculptorModule() {
         title="Terra-Former"
         subtitle="Topographic Generator"
         color="cyan"
-        canExport={!!modelData && mode === 'VIEW'}
+        // 3. ENABLE EXPORT BUTTON only when we have data
+        canExport={!!modelData && mode === 'VIEW' && !isProcessing}
+        // 4. CLICKING EXPORT TRIGGERS STRIPE
         onExport={startCheckout}
         sidebar={
           <div className="space-y-6">
             
-            {/* --- BACK BUTTON (VIEW MODE) --- */}
             {mode === 'VIEW' && (
                 <button 
                     onClick={() => setMode('SELECT')}
@@ -177,7 +199,7 @@ export default function GeoSculptorModule() {
 
             <div className="h-px bg-zinc-800 my-4"></div>
 
-            {/* --- RENDER MODE SELECTOR --- */}
+            {/* RENDER MODE */}
             <div className={`space-y-2 ${mode === 'SELECT' ? '' : 'opacity-50 pointer-events-none'}`}>
                 <label className="text-[9px] font-bold text-zinc-500 uppercase flex items-center gap-2">
                     <Globe size={10} className="text-cyan-500"/> Render Mode
@@ -192,17 +214,14 @@ export default function GeoSculptorModule() {
                 </div>
             </div>
 
-            {/* --- SEARCH & CAPTURE (ONLY IN SELECT MODE) --- */}
+            {/* SEARCH & CAPTURE */}
             {mode === 'SELECT' && (
                 <div className="space-y-4 pt-4 border-t border-zinc-800">
                     <label className="text-[9px] font-bold text-zinc-500 uppercase flex items-center gap-2">
                         <Search size={10} className="text-cyan-500"/> Search Target
                     </label>
-                    
-                    {/* 1. Search Bar */}
                     <SidebarSearch onSelect={(lat, lon) => mapRef.current?.flyTo(lat, lon)} />
                     
-                    {/* 2. Capture Button */}
                     <button 
                         onClick={triggerCapture}
                         className="w-full flex items-center justify-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white py-3 rounded-sm text-xs font-bold uppercase tracking-widest shadow-[0_0_15px_rgba(8,145,178,0.4)] transition-all active:scale-95 hover:scale-[1.02]"
@@ -212,7 +231,7 @@ export default function GeoSculptorModule() {
                 </div>
             )}
 
-            {/* --- SLIDERS (VIEW MODE ONLY) --- */}
+            {/* SLIDERS (VIEW MODE) */}
             <div className={`mt-6 ${mode === 'SELECT' ? 'hidden' : 'block'}`}>
                 <CyberSlider 
                   label="Vertical Scale" 
@@ -220,7 +239,7 @@ export default function GeoSculptorModule() {
                   value={exaggeration} 
                   onChange={setExaggeration} 
                   min={0.5} max={3} step={0.1} unit="x" color="cyan"
-                  tooltip="Adjusts vertical height."
+                  tooltip="Exaggerate terrain height for better 3D printing results."
                 />
             </div>
 
@@ -235,7 +254,6 @@ export default function GeoSculptorModule() {
         }
       >
         {mode === 'SELECT' ? (
-            // Pass the REF here so the sidebar can control it
             <MapSelector ref={mapRef} />
         ) : (
             <GeoView 
@@ -246,8 +264,15 @@ export default function GeoSculptorModule() {
         )}
       </ModuleLayout>
 
+      {/* 5. PAYMENT MODAL */}
       {showModal && (
-        <PaymentModal clientSecret={clientSecret} onClose={closeModal} onSuccess={handleDownload} color="cyan" price="$2.50" />
+        <PaymentModal 
+            clientSecret={clientSecret} 
+            onClose={closeModal} 
+            onSuccess={handleDownload} // <--- TRIGGERS DOWNLOAD ON SUCCESS
+            color="cyan" 
+            price="$1.99" 
+        />
       )}
     </>
   );

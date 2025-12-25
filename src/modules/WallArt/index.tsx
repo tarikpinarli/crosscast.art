@@ -172,7 +172,7 @@ export default function WallArtModule() {
           onClose={closeModal} 
           onSuccess={handleDownload} 
           color="purple"
-          price="$1.99"
+          price="$0.99"
         />
       )}
     </>
