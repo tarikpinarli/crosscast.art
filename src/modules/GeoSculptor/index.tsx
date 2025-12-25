@@ -9,7 +9,8 @@ import {
     MapPin, 
     ScanLine, 
     Waypoints, 
-    Waves 
+    Waves,
+    Square // <--- NEW IMPORT
 } from 'lucide-react';
 import * as THREE from 'three';
 import { STLExporter } from 'three-stdlib';
@@ -93,7 +94,7 @@ export default function GeoSculptorModule() {
   // --- STATE ---
   const [mode, setMode] = useState<'SELECT' | 'VIEW'>('SELECT');
   
-  // Model Data extended to include water
+  // Model Data
   const [modelData, setModelData] = useState<{ 
       buildings: THREE.BufferGeometry | null, 
       base: THREE.BufferGeometry, 
@@ -109,6 +110,7 @@ export default function GeoSculptorModule() {
   const [isCityMode, setIsCityMode] = useState(true); 
   const [isRoadsEnabled, setIsRoadsEnabled] = useState(false); 
   const [isWaterEnabled, setIsWaterEnabled] = useState(false); 
+  const [isBaseEnabled, setIsBaseEnabled] = useState(true); // <--- NEW STATE (Default True)
   const [exaggeration, setExaggeration] = useState(1.0); 
 
   // --- ACTIONS ---
@@ -121,6 +123,7 @@ export default function GeoSculptorModule() {
       // Reset toggles to default
       setIsRoadsEnabled(false);
       setIsWaterEnabled(false);
+      setIsBaseEnabled(true); // <--- Reset Base
   };
 
   const triggerCapture = () => {
@@ -134,10 +137,8 @@ export default function GeoSculptorModule() {
 
   const handleMapConfirm = async (selectedCoords: { lat: number, lon: number, zoom: number, radius: number }) => {
       setCoords(selectedCoords);
-      // Clear data immediately to show loading state
       setModelData(null); 
       setMode('VIEW');
-      // Trigger generation (forcing fresh fetch)
       generateModel(selectedCoords, isCityMode, isRoadsEnabled, isWaterEnabled, exaggeration, true);
   };
 
@@ -155,14 +156,11 @@ export default function GeoSculptorModule() {
       setStatus("Processing Data...");
 
       try {
-          // If we have existing data and we are just toggling layers, try to preserve the base/buildings
           let currentBuildings = (forceFresh) ? null : (modelData?.buildings || null);
           let currentBase = (forceFresh) ? null : (modelData?.base || null);
           let currentRoads = (forceFresh) ? null : (modelData?.roads || null);
           let currentWater = (forceFresh) ? null : (modelData?.water || null);
 
-          // 1. Fetch Buildings/Terrain (The Core Geometry)
-          // Fetch if missing OR if we forced a refresh OR if mode changed
           const needsFreshGeo = !currentBase || (cityMode && !currentBuildings && !forceFresh) || (!cityMode && !currentBase && !forceFresh) || forceFresh;
 
           if (needsFreshGeo) {
@@ -178,7 +176,6 @@ export default function GeoSculptorModule() {
               }
           }
 
-          // 2. Fetch Roads (Independent Layer)
           if (roadsEnabled && cityMode) {
               if (!currentRoads || forceFresh) {
                  setStatus("Tracing Highway Network...");
@@ -189,7 +186,6 @@ export default function GeoSculptorModule() {
               currentRoads = null; 
           }
 
-          // 3. Fetch Water (Independent Layer)
           if (waterEnabled && cityMode) {
               if (!currentWater || forceFresh) {
                  setStatus("Mapping Water Bodies...");
@@ -200,7 +196,6 @@ export default function GeoSculptorModule() {
               currentWater = null;
           }
 
-          // 4. Update State
           setModelData({
               buildings: currentBuildings,
               base: currentBase!,
@@ -218,7 +213,7 @@ export default function GeoSculptorModule() {
       }
   };
 
-  // Re-generate on Param Change (Debounced)
+  // Re-generate on Param Change
   useEffect(() => {
      if (mode === 'VIEW' && coords) {
          const timer = setTimeout(() => generateModel(coords, isCityMode, isRoadsEnabled, isWaterEnabled, exaggeration, false), 500);
@@ -232,7 +227,9 @@ export default function GeoSculptorModule() {
     
     const group = new THREE.Group();
     
-    if (modelData.base) group.add(new THREE.Mesh(modelData.base));
+    // UPDATE: Only export base if enabled
+    if (isBaseEnabled && modelData.base) group.add(new THREE.Mesh(modelData.base));
+    
     if (modelData.buildings) group.add(new THREE.Mesh(modelData.buildings));
     if (modelData.roads) group.add(new THREE.Mesh(modelData.roads));
     if (modelData.water) group.add(new THREE.Mesh(modelData.water));
@@ -292,6 +289,22 @@ export default function GeoSculptorModule() {
                 <div className="pt-4 border-t border-zinc-800 space-y-3">
                     <label className="text-[9px] font-bold text-zinc-500 uppercase">Details</label>
                     
+                    {/* BASE TOGGLE (NEW) */}
+                    <label className="flex items-center gap-3 cursor-pointer group select-none">
+                        <div className={`w-4 h-4 border flex items-center justify-center rounded-sm transition-colors ${isBaseEnabled ? 'bg-cyan-600 border-cyan-500' : 'bg-zinc-900 border-zinc-700 group-hover:border-zinc-500'}`}>
+                             {isBaseEnabled && <Square size={10} className="text-white fill-white" />}
+                        </div>
+                        <input 
+                            type="checkbox" 
+                            className="hidden" 
+                            checked={isBaseEnabled} 
+                            onChange={(e) => setIsBaseEnabled(e.target.checked)} 
+                        />
+                        <span className="text-[10px] font-bold uppercase text-zinc-400 group-hover:text-zinc-200 transition-colors flex items-center gap-2">
+                            <Square size={12} /> Base Plate
+                        </span>
+                    </label>
+
                     {/* Road Toggle */}
                     <label className="flex items-center gap-3 cursor-pointer group select-none">
                         <div className={`w-4 h-4 border flex items-center justify-center rounded-sm transition-colors ${isRoadsEnabled ? 'bg-cyan-600 border-cyan-500' : 'bg-zinc-900 border-zinc-700 group-hover:border-zinc-500'}`}>
@@ -370,8 +383,9 @@ export default function GeoSculptorModule() {
         ) : (
             <GeoView 
                 modelData={modelData}
-                color="#22d3ee"
+                color="#e4e4e7"
                 isProcessing={isProcessing}
+                isBaseEnabled={isBaseEnabled} // <--- PASSING THE PROP
             />
         )}
       </ModuleLayout>

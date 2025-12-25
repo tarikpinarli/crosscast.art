@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 
 // --- Types ---
-// UPDATE: Added 'roads' to the interface so TypeScript knows it exists
 interface GeoViewProps {
   modelData: { 
       buildings: THREE.BufferGeometry | null, 
@@ -25,6 +24,7 @@ interface GeoViewProps {
   } | null;
   color: string;
   isProcessing: boolean;
+  isBaseEnabled: boolean; // <--- ADDED PROP
 }
 
 // --- UI Components ---
@@ -51,7 +51,7 @@ const HudButton = ({ onClick, icon: Icon, text, subtext, active = false, warning
   </button>
 );
 
-// --- 🎥 DETERMINISTIC CAMERA CONTROLLER (NO BUZZING) ---
+// --- 🎥 DETERMINISTIC CAMERA CONTROLLER ---
 const CameraController = ({ 
   viewMode, 
   setViewMode 
@@ -61,38 +61,32 @@ const CameraController = ({
 }) => {
   const { camera, controls } = useThree();
   
-  // Animation State
   const isAnimating = useRef(false);
   const startTime = useRef(0);
-  const DURATION = 1.2; // Seconds for transition
+  const DURATION = 1.2;
 
-  // Vectors to interpolate between
   const startPos = useRef(new THREE.Vector3());
   const startTarget = useRef(new THREE.Vector3());
   const endPos = useRef(new THREE.Vector3());
   const endTarget = useRef(new THREE.Vector3());
 
-  // Easing function: Cubic Ease In/Out (Buttery Smooth)
   const easeInOutCubic = (t: number) => {
     return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   };
 
-  // 1. Trigger Animation
   useEffect(() => {
     if (viewMode === 'idle' || !controls) return;
     const orb = controls as any;
 
-    // A. Capture Starting State
     startPos.current.copy(camera.position);
     startTarget.current.copy(orb.target);
 
-    // B. Define Ending State based on current Target Center
     const center = orb.target.clone();
-    endTarget.current.copy(center); // Keep looking at the same spot
+    endTarget.current.copy(center); 
 
     switch (viewMode) {
       case 'top':
-        endPos.current.set(center.x, center.y + 500, center.z + 1); // +1 z to prevent gimbal lock
+        endPos.current.set(center.x, center.y + 500, center.z + 1); 
         break;
       case 'angle':
         endPos.current.set(center.x + 300, center.y + 300, center.z + 300); 
@@ -105,48 +99,35 @@ const CameraController = ({
         return;
     }
 
-    // C. Disable Controls & Start Timer
     orb.enabled = false;
     isAnimating.current = true;
     startTime.current = performance.now();
 
   }, [viewMode, controls, camera]);
 
-  // 2. Animation Loop
   useFrame(() => {
     if (!isAnimating.current || !controls) return;
     const orb = controls as any;
 
-    // Calculate Progress (0.0 to 1.0)
     const now = performance.now();
-    const elapsed = (now - startTime.current) / 1000; // Convert to seconds
-    let t = Math.min(1, elapsed / DURATION); // Clamp to max 1
+    const elapsed = (now - startTime.current) / 1000; 
+    let t = Math.min(1, elapsed / DURATION); 
     
-    // Apply Easing
     const smoothedT = easeInOutCubic(t);
 
-    // Interpolate Position
     camera.position.lerpVectors(startPos.current, endPos.current, smoothedT);
     
-    // Interpolate Target (LookAt)
     orb.target.lerpVectors(startTarget.current, endTarget.current, smoothedT);
     
-    // Force Update
     camera.lookAt(orb.target);
     camera.updateProjectionMatrix();
 
-    // Check if finished
     if (t >= 1) {
       isAnimating.current = false;
-      
-      // Snap to final values to be mathematically perfect
       camera.position.copy(endPos.current);
       orb.target.copy(endTarget.current);
-      
-      // Re-enable controls
       orb.enabled = true;
       orb.update();
-      
       setViewMode('idle');
     }
   });
@@ -158,12 +139,13 @@ const CameraController = ({
 const SceneContent = ({ 
   modelData, 
   color, 
-  autoRotate 
-}: { modelData: any, color: string, autoRotate: boolean }) => {
-  const VIBE_CYAN = "#06b6d4"; 
+  autoRotate,
+  isBaseEnabled // <--- ACCEPT PROP
+}: { modelData: any, color: string, autoRotate: boolean, isBaseEnabled: boolean }) => {
+  const VIBE_CYAN = "#ffffffff"; 
   const VIBE_DARK_BASE = "#27272a"; 
-  const VIBE_ROAD = "#18181b"; // Dark Asphalt
-  const VIBE_WATER = "#0e7490";
+  const VIBE_ROAD = "#555555ff"; 
+  const VIBE_WATER = "#2467f7ff";
 
   return (
     <>
@@ -183,12 +165,11 @@ const SceneContent = ({
       <directionalLight position={[50, 20, -50]} intensity={1} color={VIBE_CYAN} />
       <Environment preset="city" />
 
-      {/* AUTO-CENTERING WRAPPER */}
       <Bounds fit clip observe margin={1.2}>
         <Center>
             <group>
-                {/* BASE */}
-                {modelData?.base && (
+                {/* BASE - CONDITIONAL RENDER */}
+                {isBaseEnabled && modelData?.base && (
                     <mesh geometry={modelData.base}>
                     <meshStandardMaterial 
                         color={VIBE_DARK_BASE} 
@@ -199,7 +180,7 @@ const SceneContent = ({
                     </mesh>
                 )}
 
-                {/* UPDATE: ROADS (Rendered in Dark Asphalt) */}
+                {/* ROADS */}
                 {modelData?.roads && (
                     <mesh geometry={modelData.roads}>
                         <meshStandardMaterial 
@@ -210,13 +191,13 @@ const SceneContent = ({
                         />
                     </mesh>
                 )}
-                {/* WATER (NEW) */}
+                {/* WATER */}
                 {modelData?.water && (
                     <mesh geometry={modelData.water}>
                         <meshStandardMaterial 
                             color={VIBE_WATER} 
-                            roughness={0.1} // shiny
-                            metalness={0.8} // reflective
+                            roughness={0.1} 
+                            metalness={0.8} 
                             emissive={VIBE_WATER}
                             emissiveIntensity={0.2}
                             side={THREE.DoubleSide} 
@@ -246,16 +227,13 @@ const SceneContent = ({
 };
 
 // --- Main Component ---
-export const GeoView = ({ modelData, color, isProcessing }: GeoViewProps) => {
+export const GeoView = ({ modelData, color, isProcessing, isBaseEnabled }: GeoViewProps) => {
   const [viewMode, setViewMode] = useState<string>('idle');
   const [autoRotate, setAutoRotate] = useState<boolean>(false);
   const [controlsOpen, setControlsOpen] = useState(true);
 
   const handleViewChange = (mode: string) => {
-    // Reset auto-rotate
     setAutoRotate(false);
-    
-    // Trigger change (Force a re-render/effect trigger even if clicking same button)
     setViewMode('idle');
     setTimeout(() => {
         setViewMode(mode);
@@ -263,8 +241,10 @@ export const GeoView = ({ modelData, color, isProcessing }: GeoViewProps) => {
   };
 
   return (
-    <div className="w-full h-full bg-zinc-950 rounded-sm overflow-hidden shadow-2xl border border-white/10 relative group flex flex-col">
-      
+        <div 
+        className="w-full h-full rounded-sm overflow-hidden shadow-2xl border border-white/10 relative group flex flex-col"
+        style={{ backgroundColor: "#18181b" }}
+        >      
       {/* 1. Empty / Processing Overlay State */}
       {(!modelData || isProcessing) && (
         <div className="absolute inset-0 flex flex-col gap-4 items-center justify-center z-10 pointer-events-none bg-black/80 backdrop-blur-md">
@@ -352,7 +332,14 @@ export const GeoView = ({ modelData, color, isProcessing }: GeoViewProps) => {
       {/* 4. Canvas */}
       <Canvas dpr={[1, 1.5]} className="w-full h-full">
           <CameraController viewMode={viewMode} setViewMode={setViewMode} />
-          {modelData && <SceneContent modelData={modelData} color={color} autoRotate={autoRotate} />}
+          {modelData && (
+             <SceneContent 
+                modelData={modelData} 
+                color={color} 
+                autoRotate={autoRotate} 
+                isBaseEnabled={isBaseEnabled} // <--- PASSING THE PROP
+             />
+          )}
       </Canvas>
     </div>
   );
