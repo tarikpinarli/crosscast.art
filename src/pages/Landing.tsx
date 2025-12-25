@@ -43,7 +43,7 @@ const MODULES = [
     path: '/geo',
     status: 'ONLINE',
     color: 'cyan',
-    videoOverlay: null // Placeholder for now
+    videoOverlay: '/module_videos/building_top.mov' // Placeholder for now
   }
 ];
 
