@@ -232,7 +232,7 @@ export const fetchRoadsGeometry = async (
     }
 };
 
-// --- WATER FETCH (FIXED) ---
+// --- WATER FETCH ---
 export const fetchWaterGeometry = async (
     centerLat: number, 
     centerLon: number, 
@@ -274,10 +274,6 @@ export const fetchWaterGeometry = async (
              const rawPoints: [number, number][] = [];
              el.geometry.forEach((node: any) => {
                  const pt = latLonToMeters(node.lat, node.lon, centerLat, centerLon);
-                 
-                 // --- FIX HERE: Use Positive Y (pt.y) ---
-                 // We are creating a 2D shape. When we later rotateX(-90), 
-                 // this +Y (North) will correctly point to -Z (North).
                  rawPoints.push([pt.x * scale, pt.y * scale]); 
              });
 
@@ -370,6 +366,12 @@ export const fetchBuildingsGeometry = async (
     const CLIP_BOX: any = [[[-50, -50], [50, -50], [50, 50], [-50, 50], [-50, -50]]];
     
     const elements = data.elements.filter((el: any) => (el.type === 'way' && el.geometry));
+
+    // --- HARD LIMIT CHECK ---
+    const MAX_BUILDINGS = 25000;
+    if (elements.length > MAX_BUILDINGS) {
+        throw new Error(`Limit Exceeded: ${elements.length} buildings found (Max: ${MAX_BUILDINGS}).`);
+    }
 
     if (elements.length === 0) return { buildings: null, base: finalBase };
 

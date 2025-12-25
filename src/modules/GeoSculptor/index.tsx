@@ -10,7 +10,8 @@ import {
     ScanLine, 
     Waypoints, 
     Waves,
-    Square 
+    Square,
+    AlertTriangle
 } from 'lucide-react';
 import * as THREE from 'three';
 import { STLExporter } from 'three-stdlib';
@@ -30,18 +31,16 @@ import {
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
-// --- SIDEBAR SEARCH COMPONENT (FIXED) ---
+// --- SIDEBAR SEARCH COMPONENT ---
 const SidebarSearch = ({ onSelect }: { onSelect: (lat: number, lon: number) => void }) => {
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     
-    // Refs to handle click-outside and selection logic
     const wrapperRef = useRef<HTMLDivElement>(null);
     const isSelectionRef = useRef(false);
 
-    // 1. Handle Click Outside to close dropdown
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
@@ -52,9 +51,7 @@ const SidebarSearch = ({ onSelect }: { onSelect: (lat: number, lon: number) => v
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // 2. Search Effect
     useEffect(() => {
-        // If we just selected an item from the list, DO NOT run a new search
         if (isSelectionRef.current) {
             isSelectionRef.current = false;
             return;
@@ -91,13 +88,10 @@ const SidebarSearch = ({ onSelect }: { onSelect: (lat: number, lon: number) => v
 
     const handleSelect = (feature: any) => {
         const [lon, lat] = feature.center;
-        
-        // Mark this update as a selection so the useEffect doesn't trigger a re-search
         isSelectionRef.current = true;
-        
         setQuery(feature.text);
-        setResults([]); // Clear results immediately
-        setIsOpen(false); // Close dropdown immediately
+        setResults([]);
+        setIsOpen(false);
         onSelect(lat, lon);
     };
 
@@ -150,6 +144,7 @@ export default function GeoSculptorModule() {
   } | null>(null);
   
   const [status, setStatus] = useState<string>(""); 
+  const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [coords, setCoords] = useState<{lat: number, lon: number, zoom: number, radius: number} | null>(null);
   
@@ -167,6 +162,7 @@ export default function GeoSculptorModule() {
       setMode('SELECT');
       setModelData(null);
       setCoords(null);
+      setError(null);
       // Reset toggles to default
       setIsRoadsEnabled(false);
       setIsWaterEnabled(false);
@@ -185,6 +181,7 @@ export default function GeoSculptorModule() {
   const handleMapConfirm = async (selectedCoords: { lat: number, lon: number, zoom: number, radius: number }) => {
       setCoords(selectedCoords);
       setModelData(null); 
+      setError(null);
       setMode('VIEW');
       generateModel(selectedCoords, isCityMode, isRoadsEnabled, isWaterEnabled, exaggeration, true);
   };
@@ -199,6 +196,7 @@ export default function GeoSculptorModule() {
       forceFresh: boolean = false
   ) => {
       setIsProcessing(true);
+      setError(null);
       if (forceFresh) setModelData(null); 
       setStatus("Processing Data...");
 
@@ -252,8 +250,8 @@ export default function GeoSculptorModule() {
 
       } catch(e: any) {
           console.error(e);
-          alert(`Error: ${e.message}`);
-          handleReset();
+          setError(e.message || "An error occurred");
+          setModelData(null);
       } finally {
           setIsProcessing(false);
           setStatus("");
@@ -262,7 +260,7 @@ export default function GeoSculptorModule() {
 
   // Re-generate on Param Change
   useEffect(() => {
-     if (mode === 'VIEW' && coords) {
+     if (mode === 'VIEW' && coords && !error) {
          const timer = setTimeout(() => generateModel(coords, isCityMode, isRoadsEnabled, isWaterEnabled, exaggeration, false), 500);
          return () => clearTimeout(timer);
      }
@@ -298,7 +296,7 @@ export default function GeoSculptorModule() {
         title="Terra-Former"
         subtitle="Topographic Generator"
         color="cyan"
-        canExport={!!modelData && mode === 'VIEW' && !isProcessing}
+        canExport={!!modelData && mode === 'VIEW' && !isProcessing && !error}
         onExport={startCheckout}
         sidebar={
           <div className="space-y-6">
@@ -329,8 +327,23 @@ export default function GeoSculptorModule() {
                 </div>
             </div>
 
-            {/* LAYERS (City Mode Only) */}
-            {mode === 'VIEW' && isCityMode && (
+            {/* ERROR DISPLAY */}
+            {error && (
+                <div className="p-3 bg-red-950/30 border border-red-500/50 rounded-sm">
+                    <div className="flex items-start gap-3">
+                        <AlertTriangle size={16} className="text-red-500 mt-0.5 shrink-0" />
+                        <div className="space-y-1">
+                            <p className="text-[10px] font-bold text-red-200 uppercase">{error}</p>
+                            <p className="text-[9px] text-red-300/70 leading-relaxed">
+                                Zoom in to reduce the number of buildings and try again.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* LAYERS (City Mode Only) - Hide if error */}
+            {mode === 'VIEW' && isCityMode && !error && (
                 <div className="pt-4 border-t border-zinc-800 space-y-3">
                     <label className="text-[9px] font-bold text-zinc-500 uppercase">Details</label>
                     
@@ -390,7 +403,7 @@ export default function GeoSculptorModule() {
                     <label className="text-[9px] font-bold text-zinc-500 uppercase flex items-center gap-2">
                         <Search size={10} className="text-cyan-500"/> Search Target
                     </label>
-                    {/* UPDATED SEARCH COMPONENT */}
+                    
                     <SidebarSearch onSelect={(lat, lon) => mapRef.current?.flyTo(lat, lon)} />
                     
                     <button 
@@ -399,11 +412,14 @@ export default function GeoSculptorModule() {
                     >
                         <ScanLine size={16} /> Capture Area
                     </button>
+                    <p className="text-[9px] text-zinc-500 text-center px-4">
+                        Zoom in to reduce building count for better performance.
+                    </p>
                 </div>
             )}
 
             {/* SLIDERS (View Mode) */}
-            <div className={`mt-6 ${mode === 'SELECT' ? 'hidden' : 'block'}`}>
+            <div className={`mt-6 ${mode === 'SELECT' || error ? 'hidden' : 'block'}`}>
                 <CyberSlider 
                   label="Vertical Scale" 
                   icon={isCityMode ? Building2 : Mountain} 
