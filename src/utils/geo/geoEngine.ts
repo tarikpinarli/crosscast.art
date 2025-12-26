@@ -5,7 +5,6 @@ import polygonClipping from 'polygon-clipping';
 // Imports from siblings
 import { cleanAndStandardize, latLonToMeters, ensureCCW } from './geoShared';
 import { fetchRoadsGeometry } from './fetchRoads';
-import { fetchWaterGeometry } from './fetchWater';
 import { fetchTerrainGeometry } from './fetchTerrain'; // Exported so index.tsx can use it
 
 // Re-export for easier imports in the app
@@ -67,9 +66,8 @@ export const fetchBuildingsGeometry = async (
     const scale = 50 / (radiusKM * 1000); 
 
     // --- ORCHESTRATE OTHER LAYERS ---
-    // Start fetching water and roads in parallel while we process buildings
+    // Start fetching roads in parallel while we process buildings
     let mergedRoadsPromise: Promise<THREE.BufferGeometry | null> = Promise.resolve(null);
-    let mergedWaterPromise: Promise<THREE.BufferGeometry | null> = fetchWaterGeometry(centerLat, centerLon, radiusKM);
 
     if (options.enableRoads) {
         if (setStatus) setStatus("Fetching Road Network...");
@@ -134,12 +132,10 @@ export const fetchBuildingsGeometry = async (
 
     // Await parallel tasks
     const roads = await mergedRoadsPromise;
-    const water = await mergedWaterPromise;
 
     return { 
         buildings: finalBuildings, 
         base: finalBase,
-        roads: roads,
-        water: water
+        roads: roads
     };
 };

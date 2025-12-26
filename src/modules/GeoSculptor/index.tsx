@@ -9,39 +9,34 @@ import {
     MapPin, 
     ScanLine, 
     Waypoints, 
-    Waves,
     Square 
 } from 'lucide-react';
 import * as THREE from 'three';
 import { STLExporter } from 'three-stdlib';
 
 import { ModuleLayout } from '../../components/layout/ModuleLayout';
-import { CyberSlider } from '../../components/ui/CyberSlider';
 import { PaymentModal } from '../../components/PaymentModal';
 import { usePayment } from '../../hooks/usePayment';
 import { GeoView } from './GeoView';
 import { MapSelector, MapSelectorRef } from './MapSelector';
 
-// --- NEW IMPORTS (Split Structure) ---
+// --- IMPORTS ---
 import { fetchBuildingsGeometry } from '../../utils/geo/geoEngine';
 import { fetchTerrainGeometry } from '../../utils/geo/fetchTerrain';
 import { fetchRoadsGeometry } from '../../utils/geo/fetchRoads';
-import { fetchWaterGeometry } from '../../utils/geo/fetchWater';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
-// --- SIDEBAR SEARCH COMPONENT (FIXED) ---
+// --- SIDEBAR SEARCH COMPONENT ---
 const SidebarSearch = ({ onSelect }: { onSelect: (lat: number, lon: number) => void }) => {
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     
-    // Refs to handle click-outside and selection logic
     const wrapperRef = useRef<HTMLDivElement>(null);
     const isSelectionRef = useRef(false);
 
-    // 1. Handle Click Outside to close dropdown
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
@@ -52,9 +47,7 @@ const SidebarSearch = ({ onSelect }: { onSelect: (lat: number, lon: number) => v
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // 2. Search Effect
     useEffect(() => {
-        // If we just selected an item from the list, DO NOT run a new search
         if (isSelectionRef.current) {
             isSelectionRef.current = false;
             return;
@@ -91,13 +84,10 @@ const SidebarSearch = ({ onSelect }: { onSelect: (lat: number, lon: number) => v
 
     const handleSelect = (feature: any) => {
         const [lon, lat] = feature.center;
-        
-        // Mark this update as a selection so the useEffect doesn't trigger a re-search
         isSelectionRef.current = true;
-        
         setQuery(feature.text);
-        setResults([]); // Clear results immediately
-        setIsOpen(false); // Close dropdown immediately
+        setResults([]);
+        setIsOpen(false);
         onSelect(lat, lon);
     };
 
@@ -145,8 +135,7 @@ export default function GeoSculptorModule() {
   const [modelData, setModelData] = useState<{ 
       buildings: THREE.BufferGeometry | null, 
       base: THREE.BufferGeometry, 
-      roads?: THREE.BufferGeometry | null,
-      water?: THREE.BufferGeometry | null 
+      roads?: THREE.BufferGeometry | null
   } | null>(null);
   
   const [status, setStatus] = useState<string>(""); 
@@ -156,9 +145,7 @@ export default function GeoSculptorModule() {
   // Params
   const [isCityMode, setIsCityMode] = useState(true); 
   const [isRoadsEnabled, setIsRoadsEnabled] = useState(false); 
-  const [isWaterEnabled, setIsWaterEnabled] = useState(false); 
   const [isBaseEnabled, setIsBaseEnabled] = useState(true); 
-  const [exaggeration, setExaggeration] = useState(1.0); 
 
   // --- ACTIONS ---
 
@@ -169,7 +156,6 @@ export default function GeoSculptorModule() {
       setCoords(null);
       // Reset toggles to default
       setIsRoadsEnabled(false);
-      setIsWaterEnabled(false);
       setIsBaseEnabled(true); 
   };
 
@@ -186,7 +172,7 @@ export default function GeoSculptorModule() {
       setCoords(selectedCoords);
       setModelData(null); 
       setMode('VIEW');
-      generateModel(selectedCoords, isCityMode, isRoadsEnabled, isWaterEnabled, exaggeration, true);
+      generateModel(selectedCoords, isCityMode, isRoadsEnabled, true);
   };
 
   // Main Generator Logic
@@ -194,8 +180,6 @@ export default function GeoSculptorModule() {
       c: {lat:number, lon:number, radius: number}, 
       cityMode: boolean,
       roadsEnabled: boolean,
-      waterEnabled: boolean,
-      exagg: number,
       forceFresh: boolean = false
   ) => {
       setIsProcessing(true);
@@ -206,7 +190,6 @@ export default function GeoSculptorModule() {
           let currentBuildings = (forceFresh) ? null : (modelData?.buildings || null);
           let currentBase = (forceFresh) ? null : (modelData?.base || null);
           let currentRoads = (forceFresh) ? null : (modelData?.roads || null);
-          let currentWater = (forceFresh) ? null : (modelData?.water || null);
 
           const needsFreshGeo = !currentBase || (cityMode && !currentBuildings && !forceFresh) || (!cityMode && !currentBase && !forceFresh) || forceFresh;
 
@@ -217,7 +200,8 @@ export default function GeoSculptorModule() {
                  currentBase = res.base;
               } else {
                  setStatus("Fetching Digital Elevation Model...");
-                 const res = await fetchTerrainGeometry(c.lat, c.lon, 12, exagg);
+                 // Default to 1.0 scale
+                 const res = await fetchTerrainGeometry(c.lat, c.lon, 12, 1.0);
                  currentBuildings = res.buildings; 
                  currentBase = res.base;
               }
@@ -233,21 +217,10 @@ export default function GeoSculptorModule() {
               currentRoads = null; 
           }
 
-          if (waterEnabled && cityMode) {
-              if (!currentWater || forceFresh) {
-                 setStatus("Mapping Water Bodies...");
-                 const waterGeom = await fetchWaterGeometry(c.lat, c.lon, c.radius);
-                 currentWater = waterGeom;
-              }
-          } else {
-              currentWater = null;
-          }
-
           setModelData({
               buildings: currentBuildings,
               base: currentBase!,
-              roads: currentRoads,
-              water: currentWater
+              roads: currentRoads
           });
 
       } catch(e: any) {
@@ -263,10 +236,10 @@ export default function GeoSculptorModule() {
   // Re-generate on Param Change
   useEffect(() => {
      if (mode === 'VIEW' && coords) {
-         const timer = setTimeout(() => generateModel(coords, isCityMode, isRoadsEnabled, isWaterEnabled, exaggeration, false), 500);
+         const timer = setTimeout(() => generateModel(coords, isCityMode, isRoadsEnabled, false), 500);
          return () => clearTimeout(timer);
      }
-  }, [exaggeration, isCityMode, isRoadsEnabled, isWaterEnabled]); 
+  }, [isCityMode, isRoadsEnabled]); 
 
   // --- 2. EXPORT LOGIC ---
   const handleDownload = () => {
@@ -277,7 +250,6 @@ export default function GeoSculptorModule() {
     if (isBaseEnabled && modelData.base) group.add(new THREE.Mesh(modelData.base));
     if (modelData.buildings) group.add(new THREE.Mesh(modelData.buildings));
     if (modelData.roads) group.add(new THREE.Mesh(modelData.roads));
-    if (modelData.water) group.add(new THREE.Mesh(modelData.water));
 
     const exporter = new STLExporter();
     const result = exporter.parse(group);
@@ -365,22 +337,6 @@ export default function GeoSculptorModule() {
                             <Waypoints size={12} /> Show Roads
                         </span>
                     </label>
-
-                    {/* Water Toggle */}
-                    <label className="flex items-center gap-3 cursor-pointer group select-none">
-                        <div className={`w-4 h-4 border flex items-center justify-center rounded-sm transition-colors ${isWaterEnabled ? 'bg-cyan-600 border-cyan-500' : 'bg-zinc-900 border-zinc-700 group-hover:border-zinc-500'}`}>
-                             {isWaterEnabled && <Waves size={10} className="text-white" />}
-                        </div>
-                        <input 
-                            type="checkbox" 
-                            className="hidden" 
-                            checked={isWaterEnabled} 
-                            onChange={(e) => setIsWaterEnabled(e.target.checked)} 
-                        />
-                        <span className="text-[10px] font-bold uppercase text-zinc-400 group-hover:text-zinc-200 transition-colors flex items-center gap-2">
-                            <Waves size={12} /> Show Water
-                        </span>
-                    </label>
                 </div>
             )}
 
@@ -390,7 +346,7 @@ export default function GeoSculptorModule() {
                     <label className="text-[9px] font-bold text-zinc-500 uppercase flex items-center gap-2">
                         <Search size={10} className="text-cyan-500"/> Search Target
                     </label>
-                    {/* UPDATED SEARCH COMPONENT */}
+                    {/* SEARCH COMPONENT */}
                     <SidebarSearch onSelect={(lat, lon) => mapRef.current?.flyTo(lat, lon)} />
                     
                     <button 

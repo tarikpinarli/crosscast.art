@@ -19,8 +19,7 @@ interface GeoViewProps {
   modelData: { 
       buildings: THREE.BufferGeometry | null, 
       base: THREE.BufferGeometry,
-      roads?: THREE.BufferGeometry | null,
-      water?: THREE.BufferGeometry | null
+      roads?: THREE.BufferGeometry | null
   } | null;
   color: string;
   isProcessing: boolean;
@@ -146,8 +145,7 @@ const SceneContent = ({
   // --- UPDATED PALETTE (Midnight Ceramic) ---
   const VIBE_CYAN = "#ffffffff";      // Ceramic White (Zinc-200)
   const VIBE_DARK_BASE = "#27272a"; // Graphite Base (Zinc-800)
-  const VIBE_ROAD = "#ada5a5ff";      // Matte Slate (Zinc-600)
-  const VIBE_WATER = "#2467f7";     // Electric Sapphire (Blue-600)
+  const VIBE_ROAD = "555555ff";      // Matte Slate (Zinc-600)
 
   // --- GARBAGE COLLECTION ---
   // When this component unmounts or modelData changes, this cleans up the GPU memory.
@@ -157,7 +155,6 @@ const SceneContent = ({
             if (modelData.base) modelData.base.dispose();
             if (modelData.buildings) modelData.buildings.dispose();
             if (modelData.roads) modelData.roads.dispose();
-            if (modelData.water) modelData.water.dispose();
         }
     };
   }, [modelData]);
@@ -202,21 +199,6 @@ const SceneContent = ({
                             color={VIBE_ROAD}
                             roughness={0.9} 
                             metalness={0.1}
-                            side={THREE.DoubleSide} 
-                        />
-                    </mesh>
-                )}
-                {/* WATER */}
-                {modelData?.water && (
-                    <mesh geometry={modelData.water}>
-                        <meshStandardMaterial 
-                            color={VIBE_WATER} 
-                            roughness={0.2} 
-                            metalness={0.6} 
-                            emissive={VIBE_WATER}
-                            emissiveIntensity={0.15}
-                            transparent={true}
-                            opacity={0.95}
                             side={THREE.DoubleSide} 
                         />
                     </mesh>
