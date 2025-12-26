@@ -15,16 +15,6 @@ const MODULES = [
     videoOverlay: '/module_videos/apple_steve_shadow.mov'
   },
   {
-    id: 'meshy',
-    name: 'Neural Latent',
-    desc: 'Generative AI 3D modeling. Upload a single 2D image and let our neural core hallucinate a 3D mesh in seconds.',
-    icon: Activity, 
-    path: '/meshy',
-    status: 'ONLINE', 
-    color: 'purple',
-    videoOverlay: null 
-  },
-  {
     id: 'litho',
     name: 'Luminance',
     desc: 'Convert any photo into a high-precision lithophane. No complex settings—just upload, preview, and print.',
