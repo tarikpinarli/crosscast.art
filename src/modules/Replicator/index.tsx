@@ -15,12 +15,12 @@ const FRONTEND_HOST = import.meta.env.PROD
     : `http://${import.meta.env.VITE_LOCAL_IP}:5173`;
 
 export default function Replicator() {
-    // 1. SAFE HYDRATION STATE
+    // 1. SAFE HYDRATION STATE (Fixes Error #418)
     const [isMounted, setIsMounted] = useState(false);
+    
+    // 2. APP STATE
     const [sessionId, setSessionId] = useState<string>('');
     const [isMobile, setIsMobile] = useState(false);
-
-    // 2. APP STATE
     const [isConnected, setIsConnected] = useState(false);
     const [frames, setFrames] = useState<string[]>([]);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -35,36 +35,28 @@ export default function Replicator() {
     useEffect(() => {
         setIsMounted(true);
         
-        // Check URL only after mounting to prevent Error #418
+        // Check URL only AFTER mounting to prevent Server/Client mismatch
         const queryParams = new URLSearchParams(window.location.search);
         const urlSessionId = queryParams.get('session');
         
         let currentSession = '';
 
         if (urlSessionId) {
-            // We are the SENSOR (Mobile)
             setIsMobile(true);
             currentSession = urlSessionId;
             setSessionId(urlSessionId);
         } else {
-            // We are the HOST (Desktop)
             setIsMobile(false);
             currentSession = uuidv4().slice(0, 8).toUpperCase();
             setSessionId(currentSession);
         }
 
-        // 4. SOCKET CONNECTION
         console.log("🔌 Connecting to Backend:", BACKEND_URL);
         
         const socket = io(BACKEND_URL, {
-            transports: ['polling', 'websocket'], // Polling first helps bypass firewalls
+            transports: ['polling', 'websocket'], 
             reconnectionAttempts: 10,
-            timeout: 60000,
             forceNew: true,
-            // Header bypass for local dev (ignored in prod)
-            extraHeaders: {
-                "ngrok-skip-browser-warning": "69420"
-            }
         });
 
         socketRef.current = socket;
@@ -82,7 +74,7 @@ export default function Replicator() {
         });
 
         socket.on('frame_received', (data) => {
-            console.log("📸 Frame received on client");
+            console.log("📸 Frame received");
             setFrames([data.image]); 
             setStatusMessage("Optical Data Synced.");
         });
@@ -93,20 +85,16 @@ export default function Replicator() {
         });
 
         socket.on('model_ready', (data) => {
-            console.log("🔥 Model Data Received:", data.url);
             setIsProcessing(false);
             setModelReady(true);
             setModelUrl(data.url);
             setStatusMessage("Neural Mesh Compiled.");
         });
 
-        socket.on('connect_error', (err) => {
-            console.error("❌ Connection Error:", err.message);
-        });
-
         return () => { socket.disconnect(); };
     }, []);
 
+    // 4. IMAGE COMPRESSION
     const compressImage = (file: File): Promise<string> => {
         return new Promise((resolve) => {
             const reader = new FileReader();
@@ -146,18 +134,12 @@ export default function Replicator() {
     };
 
     const handleGenerate = () => {
-        if (socketRef.current) {
-            socketRef.current.emit('process_3d', { sessionId });
-        }
+        if (socketRef.current) socketRef.current.emit('process_3d', { sessionId });
     };
 
-    // 5. LOADING STATE (Prevents Hydration Mismatch)
+    // 5. LOADING STATE (This is what actually fixes the 418 Error)
     if (!isMounted) {
-        return (
-            <div className="bg-black min-h-screen flex items-center justify-center text-white">
-                 <Loader2 className="animate-spin text-cyan-500" size={48} />
-            </div>
-        );
+        return <div className="bg-black min-h-screen" />;
     }
 
     // --- MOBILE SENSOR UI ---
@@ -246,7 +228,6 @@ export default function Replicator() {
                     <div className="flex justify-center h-96">
                         <div className="w-full max-w-md h-full bg-zinc-900/30 border border-zinc-800 rounded-[3rem] relative overflow-hidden flex items-center justify-center">
                             
-                            {/* PRIORITY 1: 3D MODEL VIEW */}
                             {modelReady && modelUrl ? (
                                 <div className="w-full h-full relative animate-in fade-in zoom-in duration-1000">
                                     <ModelViewer url={`${BACKEND_URL}/files/${sessionId}/${modelUrl}`} />
@@ -256,9 +237,7 @@ export default function Replicator() {
                                         </div>
                                     </div>
                                 </div>
-                            ) 
-                            /* PRIORITY 2: CAMERA FEED / PROCESSING */
-                            : frames.length > 0 ? (
+                            ) : frames.length > 0 ? (
                                 <div className="relative w-full h-full p-2">
                                     <img src={frames[0]} alt="Scan" className={`w-full h-full object-cover rounded-[2.5rem] ${isProcessing ? 'blur-sm opacity-50' : ''}`} />
                                     {isProcessing && (
@@ -270,15 +249,11 @@ export default function Replicator() {
                                         </div>
                                     )}
                                 </div>
-                            )
-                            /* PRIORITY 3: QR CODE (If not connected) */
-                            : !isConnected ? (
+                            ) : !isConnected ? (
                                 <div className="w-full scale-90">
                                     <QrHandshake sessionId={sessionId} host={FRONTEND_HOST} />
                                 </div>
-                            )
-                            /* PRIORITY 4: WAITING STATE (Connected but no photo) */
-                            : (
+                            ) : (
                                 <div className="text-center animate-pulse">
                                     <Cpu size={64} className="text-cyan-500 mx-auto mb-6" />
                                     <h2 className="text-3xl font-black uppercase text-white italic tracking-tighter">Uplink <span className="text-cyan-500">Active</span></h2>
