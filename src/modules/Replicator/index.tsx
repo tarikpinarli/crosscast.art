@@ -8,14 +8,15 @@ import { ModelViewer } from './components/ModelViewer';
 import { Cpu, ScanLine, Smartphone, Box, Loader2, Download, Camera } from 'lucide-react';
 
 // --- CONFIGURATION ---
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+// UPDATED: Now defaults to your Render URL if the ENV variable is missing
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "https://replicator-backend.onrender.com";
 
 const FRONTEND_HOST = import.meta.env.PROD
     ? window.location.origin
-    : `http://${import.meta.env.VITE_LOCAL_IP}:5173`;
+    : `http://${import.meta.env.VITE_LOCAL_IP || 'localhost'}:5173`;
 
 export default function Replicator() {
-    // 1. SAFE HYDRATION STATE (Fixes Error #418)
+    // 1. SAFE HYDRATION STATE
     const [isMounted, setIsMounted] = useState(false);
     
     // 2. APP STATE
@@ -53,8 +54,9 @@ export default function Replicator() {
 
         console.log("🔌 Connecting to Backend:", BACKEND_URL);
         
+        // UPDATED: Connection options for better stability
         const socket = io(BACKEND_URL, {
-            transports: ['polling', 'websocket'], 
+            transports: ['websocket', 'polling'], // Prioritize websocket
             reconnectionAttempts: 10,
             forceNew: true,
         });
@@ -87,7 +89,9 @@ export default function Replicator() {
         socket.on('model_ready', (data) => {
             setIsProcessing(false);
             setModelReady(true);
-            setModelUrl(data.url);
+            // Ensure we construct the full URL for the model
+            const fullModelUrl = data.url.startsWith('http') ? data.url : `${BACKEND_URL}/files/${currentSession}/${data.url}`;
+            setModelUrl(fullModelUrl);
             setStatusMessage("Neural Mesh Compiled.");
         });
 
@@ -109,8 +113,10 @@ export default function Replicator() {
                     canvas.width = MAX_WIDTH;
                     canvas.height = img.height * scaleSize;
                     const ctx = canvas.getContext('2d');
-                    ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    resolve(canvas.toDataURL('image/jpeg', 0.8));
+                    if (ctx) {
+                         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                         resolve(canvas.toDataURL('image/jpeg', 0.8));
+                    }
                 };
             };
         });
@@ -129,7 +135,10 @@ export default function Replicator() {
                 });
                 if (btn) btn.innerText = "Data Sent!";
                 setTimeout(() => { if (btn) btn.innerText = "Capture Scan"; }, 2000);
-            } catch (err) { alert("Transmission Error"); }
+            } catch (err) { 
+                console.error(err);
+                alert("Transmission Error"); 
+            }
         }
     };
 
@@ -137,7 +146,7 @@ export default function Replicator() {
         if (socketRef.current) socketRef.current.emit('process_3d', { sessionId });
     };
 
-    // 5. LOADING STATE (This is what actually fixes the 418 Error)
+    // 5. LOADING STATE
     if (!isMounted) {
         return <div className="bg-black min-h-screen" />;
     }
@@ -230,7 +239,7 @@ export default function Replicator() {
                             
                             {modelReady && modelUrl ? (
                                 <div className="w-full h-full relative animate-in fade-in zoom-in duration-1000">
-                                    <ModelViewer url={`${BACKEND_URL}/files/${sessionId}/${modelUrl}`} />
+                                    <ModelViewer url={modelUrl} />
                                     <div className="absolute top-6 left-6 pointer-events-none">
                                         <div className="bg-emerald-500/10 backdrop-blur border border-emerald-500 text-emerald-500 font-mono text-[10px] px-3 py-1.5 rounded-full flex items-center gap-2 uppercase font-bold">
                                             <Box size={12} /> <span>Live Mesh</span>
