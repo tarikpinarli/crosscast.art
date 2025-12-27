@@ -20,6 +20,9 @@ if not os.path.exists(UPLOAD_FOLDER):
 
 # 3. ROUTES & EVENTS
 @app.route('/')
+@app.route('/health')
+def health_check():
+    return "Replicator Engine Online", 200
 
 # --- SERVE FILES ---
 @app.route('/files/<room_id>/<filename>')
