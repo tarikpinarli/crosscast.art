@@ -6,3 +6,6 @@ gunicorn
 numpy
 scipy
 trimesh
+opencv-python-headless
+scikit-image
+Pillow
