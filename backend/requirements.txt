@@ -9,3 +9,4 @@ trimesh
 opencv-python-headless
 scikit-image
 Pillow
+requests
