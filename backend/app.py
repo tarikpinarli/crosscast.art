@@ -117,7 +117,15 @@ def serve_file(room_id, filename):
 
 @socketio.on('join_session')
 def handle_join(data):
-    join_room(data.get('sessionId'))
+    room = data.get('sessionId')
+    user_type = data.get('type') # 'host' or 'sensor'
+    
+    join_room(room)
+    print(f"🔗 {user_type} joined room: {room}")
+    
+    # FIX: If the mobile sensor joins, explicitly tell the desktop!
+    if user_type == 'sensor':
+        emit('session_status', {'status': 'connected'}, room=room)
 
 @socketio.on('send_frame')
 def handle_frame(data):
