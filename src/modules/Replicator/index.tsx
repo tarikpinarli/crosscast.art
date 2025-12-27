@@ -9,20 +9,18 @@ import { Cpu, ScanLine, Smartphone, Box, Loader2, Download, Camera } from 'lucid
 
 // --- CONFIGURATION ---
 const BACKEND_URL = import.meta.env.PROD 
-    ? "https://replicator-backend.onrender.com" // Used for file downloads
+    ? "https://replicator-backend.onrender.com"
     : ""; 
 
 const SOCKET_URL = import.meta.env.PROD 
-    ? "https://replicator-backend.onrender.com" // Used for WebSocket connection
+    ? "https://replicator-backend.onrender.com"
     : "/";
 
 export default function Replicator() {
-  // 1. Detect Mode: If URL has "?session=", we are a Mobile Sensor
   const queryParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
   const urlSessionId = queryParams.get('session');
   const isMobile = !!urlSessionId; 
 
-  // State
   const [sessionId, setSessionId] = useState<string>(urlSessionId || '');
   const [isConnected, setIsConnected] = useState(false);
   const [frames, setFrames] = useState<string[]>([]);
@@ -35,20 +33,17 @@ export default function Replicator() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    // Generate Session ID only if we are Desktop Host (not mobile)
     let currentSession = sessionId;
     if (!isMobile && !sessionId) {
         currentSession = uuidv4().slice(0, 8).toUpperCase();
         setSessionId(currentSession);
     }
 
-    // Connect to Socket
     const socket = io(SOCKET_URL);
     socketRef.current = socket;
 
     socket.on('connect', () => {
       console.log(isMobile ? "Mobile Sensor Connected" : "Desktop Host Connected");
-      // Identify role to the server
       socket.emit('join_session', { 
           sessionId: currentSession, 
           type: isMobile ? 'sensor' : 'host' 
@@ -59,18 +54,15 @@ export default function Replicator() {
       if (data.status === 'connected') setIsConnected(true);
     });
 
-    // Desktop: Receive Images
     socket.on('frame_received', (data) => {
         setFrames(prev => [...prev, data.image]);
     });
 
-    // Desktop: Receive Status Updates
     socket.on('processing_status', (data) => {
         setIsProcessing(true);
         setStatusMessage(data.step);
     });
 
-    // Desktop: Receive Final Model
     socket.on('model_ready', (data) => {
         setIsProcessing(false);
         setStatusMessage("Mesh Compilation Complete.");
@@ -81,23 +73,60 @@ export default function Replicator() {
     return () => {
       socket.disconnect();
     };
-  }, []); // Run once on mount
+  }, []);
 
-  // --- MOBILE ACTIONS ---
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // --- NEW: COMPRESSION HELPER ---
+  // Shrinks 10MB photos down to ~200KB for instant transfer
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          // Resize logic: Max width 800px (Plenty for 3D)
+          const MAX_WIDTH = 800;
+          const scaleSize = MAX_WIDTH / img.width;
+          canvas.width = MAX_WIDTH;
+          canvas.height = img.height * scaleSize;
+
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+          
+          // Compress to JPEG at 70% quality
+          resolve(canvas.toDataURL('image/jpeg', 0.7)); 
+        };
+      };
+    });
+  };
+
+  // --- UPDATED MOBILE ACTION ---
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && socketRef.current) {
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-            const base64 = evt.target?.result as string;
-            // Emit to server
-            socketRef.current?.emit('send_frame', { 
+        // Visual feedback immediate
+        const btn = document.getElementById('capture-btn');
+        if(btn) btn.innerText = "Transmitting...";
+        
+        try {
+            // Compress first!
+            const compressedBase64 = await compressImage(file);
+            
+            // Send smaller image
+            socketRef.current.emit('send_frame', { 
                 roomId: sessionId, 
-                image: base64 
+                image: compressedBase64 
             });
-            alert("Image Sent!"); // Simple feedback for now
-        };
-        reader.readAsDataURL(file);
+            
+            // Success Feedback
+            if(btn) btn.innerText = "Scan Sent! Take Another";
+            setTimeout(() => { if(btn) btn.innerText = "Capture Scan"; }, 2000);
+            
+        } catch (err) {
+            alert("Error sending image");
+        }
     }
   };
 
@@ -108,9 +137,7 @@ export default function Replicator() {
       }
   };
 
-  // ==========================================
-  // RENDER: MOBILE VIEW (SENSOR INTERFACE)
-  // ==========================================
+  // RENDER: MOBILE VIEW
   if (isMobile) {
       return (
         <div className="bg-black min-h-screen flex flex-col items-center justify-center p-6 text-white">
@@ -125,12 +152,13 @@ export default function Replicator() {
                     <input 
                         type="file" 
                         accept="image/*" 
-                        capture="environment" // Forces back camera
+                        capture="environment" 
                         className="hidden" 
                         ref={fileInputRef}
                         onChange={handleFileUpload}
                     />
                     <button 
+                        id="capture-btn"
                         onClick={() => fileInputRef.current?.click()}
                         className="w-full py-6 bg-cyan-500 text-black font-black text-xl uppercase rounded-xl hover:scale-105 transition-transform flex items-center justify-center gap-3 shadow-[0_0_30px_rgba(6,182,212,0.4)]"
                     >
@@ -141,24 +169,17 @@ export default function Replicator() {
                         Tap to transmit optical data to host
                     </p>
                 </div>
-
-                <div className="text-zinc-600 text-xs font-bold uppercase">
-                    Keep this tab open while scanning
-                </div>
             </div>
         </div>
       );
   }
 
-  // ==========================================
-  // RENDER: DESKTOP VIEW (HOST INTERFACE)
-  // ==========================================
+  // RENDER: DESKTOP VIEW
   return (
     <div className="bg-zinc-950 min-h-screen text-white selection:bg-cyan-500 selection:text-black">
       <Header />
       
       <div className="pt-32 pb-20 px-6 max-w-7xl mx-auto min-h-[80vh] flex flex-col">
-        {/* Module Header */}
         <div className="mb-12 border-l-2 border-cyan-500 pl-6">
           <h1 className="text-4xl md:text-6xl font-black uppercase italic tracking-tighter">
             The <span className="text-cyan-500">Replicator</span>
@@ -170,9 +191,7 @@ export default function Replicator() {
 
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           
-          {/* LEFT COLUMN: Controls */}
           <div className="space-y-8">
-             {/* Step 1: Status */}
              <div className="flex gap-4 items-start group">
                 <div className={`p-3 rounded-lg border transition-colors ${isConnected ? 'bg-emerald-500/10 border-emerald-500 text-emerald-500' : 'bg-zinc-900 border-zinc-800 text-cyan-500'}`}>
                     <Smartphone size={24} />
@@ -185,7 +204,6 @@ export default function Replicator() {
                 </div>
              </div>
 
-             {/* Step 2: Collection */}
              <div className={`flex gap-4 items-start transition-opacity ${isConnected ? 'opacity-100' : 'opacity-50'}`}>
                 <div className={`p-3 rounded-lg border transition-colors ${frames.length > 0 ? 'bg-cyan-500/10 border-cyan-500 text-cyan-500' : 'bg-zinc-900 border-zinc-800 text-zinc-500'}`}>
                     <ScanLine size={24} />
@@ -199,7 +217,6 @@ export default function Replicator() {
                 </div>
              </div>
 
-             {/* Step 3: Action Button */}
              <div className={`transition-all duration-500 ${frames.length >= 3 ? 'opacity-100 translate-x-0' : 'opacity-30 translate-x-[-10px] pointer-events-none'}`}>
                  <button 
                     onClick={handleGenerate}
@@ -225,18 +242,14 @@ export default function Replicator() {
              </div>
           </div>
 
-          {/* RIGHT COLUMN: Viewport */}
           <div className="flex justify-center">
             {!isConnected ? (
-                // State 1: Disconnected (Show QR)
                 <div className="w-full max-w-md">
                     <QrHandshake sessionId={sessionId} />
                 </div>
             ) : (
-                // State 2: Connected (Show Viewport)
                 <div className="w-full h-96 bg-zinc-900/30 border border-cyan-500/50 rounded-[3rem] relative overflow-hidden flex items-center justify-center group">
                     {modelReady && modelUrl ? (
-                        // SUCCESS: 3D Viewer
                         <div className="w-full h-full relative animate-in fade-in zoom-in duration-1000">
                              <ModelViewer url={`${BACKEND_URL}/files/${sessionId}/${modelUrl}`} />
                              <div className="absolute top-6 left-6 pointer-events-none">
@@ -248,7 +261,6 @@ export default function Replicator() {
                         </div>
                     ) : (
                         frames.length > 0 ? (
-                            // SCANNING: Show Latest Photo
                             <div className="relative w-full h-full p-2">
                                 <img 
                                     src={frames[frames.length - 1]} 
@@ -265,7 +277,6 @@ export default function Replicator() {
                                 )}
                             </div>
                         ) : (
-                            // WAITING: Ready State
                             <div className="text-center relative z-10 animate-pulse">
                                 <Cpu size={64} className="text-cyan-500 mx-auto mb-6" />
                                 <h2 className="text-3xl font-black uppercase text-white italic tracking-tighter">
