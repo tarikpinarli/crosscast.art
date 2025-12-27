@@ -1,13 +1,17 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+// We use useSearchParams because index.tsx sends ?session=ID, not /ID
+import { useSearchParams } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
-import { Camera, Wifi, Activity, CheckCircle2, Zap } from 'lucide-react';
+import { Camera, Activity, CheckCircle2 } from 'lucide-react';
 
-// ⚠️ KEEP YOUR IP ADDRESS HERE
-const SOCKET_URL = "/";
+// ⚠️ FIX: Point directly to Render, not "/"
+const SOCKET_URL = "https://replicator-backend.onrender.com";
 
 export default function MobileSensor() {
-  const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  // Get ID from ?session=XYZ to match index.tsx QR code
+  const id = searchParams.get('session');
+  
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
@@ -17,11 +21,18 @@ export default function MobileSensor() {
 
   useEffect(() => {
     if (!id) return;
-    const newSocket = io(SOCKET_URL);
+    
+    console.log("🔌 Mobile connecting to:", SOCKET_URL);
+
+    const newSocket = io(SOCKET_URL, {
+        transports: ['websocket', 'polling'],
+        reconnectionAttempts: 5
+    });
 
     newSocket.on('connect', () => {
-      console.log("Mobile Sensor Connected");
+      console.log("✅ Mobile Sensor Connected");
       setConnected(true);
+      // This triggers the "Uplink Active" on Desktop
       newSocket.emit('join_session', { sessionId: id, type: 'sensor' });
     });
 
@@ -37,7 +48,6 @@ export default function MobileSensor() {
   const startCamera = async () => {
     try {
       setCameraActive(true);
-      // Request access to the rear camera (environment)
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: 'environment' } 
       });
@@ -47,7 +57,7 @@ export default function MobileSensor() {
       }
     } catch (err) {
       console.error("Camera Error:", err);
-      alert("Could not access camera. Ensure you are on HTTPS or allowed permissions.");
+      alert("Could not access camera. Ensure you are using HTTPS.");
       setCameraActive(false);
     }
   };
@@ -55,24 +65,20 @@ export default function MobileSensor() {
   const captureFrame = () => {
     const video = videoRef.current;
     
-    if (video && socket) {
-        // 1. Create a temporary canvas to capture the frame
+    if (video && socket && id) {
         const canvas = document.createElement("canvas");
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         const ctx = canvas.getContext("2d");
         
         if (ctx) {
-            // 2. Draw current video frame to canvas
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
-            // 3. Convert to JPG Base64 String (0.7 quality for speed)
             const imageData = canvas.toDataURL("image/jpeg", 0.7);
             
-            // 4. Send to Desktop
+            // Send to Desktop
             socket.emit('send_frame', { roomId: id, image: imageData });
             
-            // 5. Visual Flash Effect
+            // Visual Flash
             video.style.opacity = "0";
             setTimeout(() => video.style.opacity = "1", 100);
         }
@@ -82,18 +88,11 @@ export default function MobileSensor() {
   return (
     <div className="bg-black min-h-screen text-white flex flex-col items-center justify-center relative overflow-hidden">
       
-      {/* CASE 1: CAMERA IS ACTIVE (Viewfinder Mode) */}
+      {/* CASE 1: CAMERA IS ACTIVE */}
       {cameraActive ? (
         <div className="relative w-full h-screen bg-black flex flex-col">
-            {/* The Live Video Feed */}
-            <video 
-                ref={videoRef} 
-                autoPlay 
-                playsInline 
-                className="w-full h-full object-cover"
-            />
+            <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
             
-            {/* Overlay UI */}
             <div className="absolute inset-0 pointer-events-none border-[1px] border-cyan-500/30 m-4 rounded-3xl">
                 {/* Crosshairs */}
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 border-t border-l border-white/50"></div>
@@ -107,22 +106,17 @@ export default function MobileSensor() {
                     </div>
                 </div>
 
-                {/* Shutter Button (Clickable) */}
+                {/* Shutter Button */}
                 <div className="absolute bottom-12 left-0 w-full flex justify-center pointer-events-auto">
-                    <button 
-                        onClick={captureFrame}
-                        className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center active:scale-90 transition-transform bg-white/10 backdrop-blur-sm"
-                    >
+                    <button onClick={captureFrame} className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center active:scale-90 transition-transform bg-white/10 backdrop-blur-sm">
                         <div className="w-16 h-16 bg-white rounded-full"></div>
                     </button>
                 </div>
             </div>
         </div>
       ) : (
-        
-        /* CASE 2: WAITING SCREEN (Same as before) */
+        /* CASE 2: WAITING SCREEN */
         <div className="p-6 flex flex-col items-center w-full max-w-sm animate-in fade-in zoom-in duration-700">
-           {/* Background Grid */}
            <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] -z-10"></div>
            
            <div className="relative mb-12">
@@ -138,15 +132,11 @@ export default function MobileSensor() {
                    Sensor <span className={connected ? 'text-emerald-500' : 'text-cyan-500'}>{connected ? 'Online' : 'Linking'}</span>
                </h1>
                <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest px-4">
-                   {connected ? `Connected to Node: ${id}` : "Searching..."}
+                   {connected ? `Connected to Node: ${id?.slice(0,4)}` : "Searching..."}
                </p>
            </div>
 
-           <button 
-               onClick={startCamera}
-               disabled={!connected}
-               className={`w-full font-black uppercase py-6 rounded-2xl tracking-[0.2em] flex items-center justify-center gap-3 shadow-lg transition-all active:scale-95 ${connected ? 'bg-cyan-500 text-black hover:bg-cyan-400' : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'}`}
-           >
+           <button onClick={startCamera} disabled={!connected} className={`w-full font-black uppercase py-6 rounded-2xl tracking-[0.2em] flex items-center justify-center gap-3 shadow-lg transition-all active:scale-95 ${connected ? 'bg-cyan-500 text-black hover:bg-cyan-400' : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'}`}>
                <Camera size={24} />
                {connected ? "Open Camera" : "Waiting for Uplink"}
            </button>
