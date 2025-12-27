@@ -2,7 +2,7 @@ import os
 import time
 import requests
 import base64
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory, jsonify
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit, join_room
 from dotenv import load_dotenv
@@ -19,12 +19,21 @@ IMGBB_API_KEY = os.environ.get("IMGBB_API_KEY")
 UPLOAD_FOLDER = 'scans'
 
 app = Flask(__name__)
-# Allow CORS for Vercel frontend
+
+# --- CORS SETUP ---
+# Allow all origins, methods, and headers for Vercel/Frontend access
 CORS(app, resources={r"/*": {"origins": "*"}})
+
 socketio = SocketIO(app, cors_allowed_origins="*", ping_timeout=60, async_mode='eventlet')
 
 if not os.path.exists(UPLOAD_FOLDER): os.makedirs(UPLOAD_FOLDER)
 
+# --- NEW PING ROUTE ---
+@app.route('/ping', methods=['GET'])
+def ping_server():
+    return "pong", 200
+
+# --- HELPER FUNCTIONS ---
 def upload_to_imgbb(local_path):
     try:
         with open(local_path, "rb") as file:
@@ -95,6 +104,8 @@ def generate_mesh_tripo(image_url, output_path):
         print(f"💥 Backend Error: {e}")
         return "CRASH"
     return "TIMEOUT"
+
+# --- ROUTES & SOCKETS ---
 
 @app.route('/files/<room_id>/<filename>')
 def serve_file(room_id, filename):
