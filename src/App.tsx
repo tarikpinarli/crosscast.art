@@ -34,7 +34,7 @@ function App() {
   useEffect(() => {
     const warmUp = async () => {
       try {
-        await fetch(`${BACKEND_URL}/ping`, { mode: 'no-cors' });
+        await fetch("https://uncadenced-eerily-ivonne.ngrok-free.dev/health");
       } catch (e) {
         console.log("📡 Server wake-up signal sent.");
       }

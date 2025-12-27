@@ -1,53 +1,42 @@
 import React, { Suspense, useEffect } from 'react';
 import { Canvas, useLoader } from '@react-three/fiber';
 import { OrbitControls, Stage, Center } from '@react-three/drei';
-import { STLLoader } from 'three-stdlib';
-import * as THREE from 'three';
+import { GLTFLoader } from 'three-stdlib';
 
 interface ModelViewerProps {
   url: string;
 }
 
 function Model({ url }: { url: string }) {
-  // Debug: Log what URL we are trying to load
-  useEffect(() => {
-    console.log("Attempting to load 3D Model from:", url);
-  }, [url]);
-
-  // The Loader Hook
-  // We add a catch for errors to prevent white screen crashes
-  const geom = useLoader(STLLoader, url, (loader) => {
-    // Optional: Settings for the loader can go here
+  // We use the loader manager to inject the Ngrok bypass header into the XHR request
+  const gltf = useLoader(GLTFLoader, url, (loader) => {
+    loader.setRequestHeader({
+      'ngrok-skip-browser-warning': '69420'
+    });
   });
 
   return (
-    <mesh geometry={geom} rotation={[-Math.PI / 2, 0, 0]} castShadow receiveShadow>
-      {/* Material: High-End Shiny Cyan Plastic */}
-      <meshPhysicalMaterial 
-        color="#06b6d4" 
-        metalness={0.5}
-        roughness={0.2}
-        clearcoat={1}
-        clearcoatRoughness={0.1}
-      />
-    </mesh>
+    <primitive 
+      object={gltf.scene} 
+      scale={1.5} 
+      castShadow 
+      receiveShadow 
+    />
   );
 }
 
 export function ModelViewer({ url }: ModelViewerProps) {
   return (
-    <div className="w-full h-full cursor-move">
-      <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 0, 150], fov: 50 }}>
+    <div className="w-full h-full cursor-move bg-zinc-900/10">
+      <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 0, 5], fov: 45 }}>
         <Suspense fallback={null}>
-          <Stage environment="city" intensity={0.6} adjustCamera>
+          <Stage environment="city" intensity={0.5} shadows="contact" adjustCamera>
             <Center>
                <Model url={url} />
             </Center>
           </Stage>
         </Suspense>
-        
-        {/* Controls: Auto-rotate creates a nice "Showcase" effect */}
-        <OrbitControls autoRotate autoRotateSpeed={4} makeDefault />
+        <OrbitControls autoRotate autoRotateSpeed={1} makeDefault enableDamping />
       </Canvas>
     </div>
   );

@@ -4,22 +4,15 @@ import { Wifi } from 'lucide-react';
 
 interface QrHandshakeProps {
   sessionId: string;
+  host?: string;
 }
 
-export const QrHandshake = ({ sessionId }: QrHandshakeProps) => {
+export const QrHandshake = ({ sessionId, host }: QrHandshakeProps) => {
   // 1. DYNAMIC URL GENERATION
-  // This calculates the real website URL (e.g., https://crosscast.art) 
-  // instead of using the hardcoded IP address.
-  const [connectionUrl, setConnectionUrl] = useState("");
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      // "origin" will be 'https://crosscast.art' when live
-      const origin = window.location.origin;
-      // We point to the main page with a session parameter
-      setConnectionUrl(`${origin}/replicator?session=${sessionId}`);
-    }
-  }, [sessionId]);
+  // Priority: Use the passed 'host' (IP address for dev), 
+  // otherwise fallback to window.location.origin (for Prod).
+  const baseUrl = host || (typeof window !== 'undefined' ? window.location.origin : '');
+  const joinLink = `${baseUrl}/replicator?session=${sessionId}`;
 
   return (
     <div className="flex flex-col items-center justify-center p-12 border border-zinc-800 bg-zinc-900/50 rounded-[3rem] relative overflow-hidden group">
@@ -27,9 +20,10 @@ export const QrHandshake = ({ sessionId }: QrHandshakeProps) => {
       <div className="absolute top-0 left-0 w-full h-1 bg-cyan-500 shadow-[0_0_20px_rgba(34,211,238,0.8)] animate-[scan_3s_ease-in-out_infinite] opacity-50 pointer-events-none"></div>
 
       <div className="relative z-10 bg-white p-4 rounded-xl mb-8 shadow-2xl shadow-cyan-500/20 group-hover:scale-105 transition-transform duration-500">
-        {connectionUrl && (
+        {/* Directly use joinLink here. No need for complex useEffects. */}
+        {joinLink && (
             <QRCodeSVG 
-            value={connectionUrl} 
+            value={joinLink} 
             size={200} 
             level="H" 
             includeMargin={true}
@@ -51,8 +45,9 @@ export const QrHandshake = ({ sessionId }: QrHandshakeProps) => {
         <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter">
             Scan to Pair Sensor
         </h3>
-        <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest max-w-xs mx-auto">
-            {connectionUrl || "Generating Secure Link..."}
+        <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest max-w-xs mx-auto truncate px-4">
+            {/* Show the URL so you can verify it says 172... not localhost */}
+            {joinLink || "Generating Secure Link..."}
         </p>
       </div>
     </div>
