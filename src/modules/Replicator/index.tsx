@@ -7,7 +7,6 @@ import { QrHandshake } from './components/QrHandshake';
 import { ModelViewer } from './components/ModelViewer';
 import { Cpu, ScanLine, Smartphone, Box, Loader2, Download, Camera } from 'lucide-react';
 
-
 // --- CONFIGURATION ---
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -16,11 +15,12 @@ const FRONTEND_HOST = import.meta.env.PROD
     : `http://${import.meta.env.VITE_LOCAL_IP}:5173`;
 
 export default function Replicator() {
-    const queryParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
-    const urlSessionId = queryParams.get('session');
-    const isMobile = !!urlSessionId;
+    // 1. SAFE HYDRATION STATE
+    const [isMounted, setIsMounted] = useState(false);
+    const [sessionId, setSessionId] = useState<string>('');
+    const [isMobile, setIsMobile] = useState(false);
 
-    const [sessionId, setSessionId] = useState<string>(urlSessionId || '');
+    // 2. APP STATE
     const [isConnected, setIsConnected] = useState(false);
     const [frames, setFrames] = useState<string[]>([]);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -31,18 +31,37 @@ export default function Replicator() {
     const socketRef = useRef<Socket | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // 3. INITIALIZATION (Runs once on mount)
     useEffect(() => {
-        let currentSession = sessionId;
-        if (!isMobile && !sessionId) {
+        setIsMounted(true);
+        
+        // Check URL only after mounting to prevent Error #418
+        const queryParams = new URLSearchParams(window.location.search);
+        const urlSessionId = queryParams.get('session');
+        
+        let currentSession = '';
+
+        if (urlSessionId) {
+            // We are the SENSOR (Mobile)
+            setIsMobile(true);
+            currentSession = urlSessionId;
+            setSessionId(urlSessionId);
+        } else {
+            // We are the HOST (Desktop)
+            setIsMobile(false);
             currentSession = uuidv4().slice(0, 8).toUpperCase();
             setSessionId(currentSession);
         }
 
+        // 4. SOCKET CONNECTION
+        console.log("🔌 Connecting to Backend:", BACKEND_URL);
+        
         const socket = io(BACKEND_URL, {
-            transports: ['polling', 'websocket'],
+            transports: ['polling', 'websocket'], // Polling first helps bypass firewalls
             reconnectionAttempts: 10,
             timeout: 60000,
             forceNew: true,
+            // Header bypass for local dev (ignored in prod)
             extraHeaders: {
                 "ngrok-skip-browser-warning": "69420"
             }
@@ -51,9 +70,10 @@ export default function Replicator() {
         socketRef.current = socket;
 
         socket.on('connect', () => {
+            console.log("✅ Socket Connected! ID:", socket.id);
             socket.emit('join_session', {
                 sessionId: currentSession,
-                type: isMobile ? 'sensor' : 'host'
+                type: urlSessionId ? 'sensor' : 'host'
             });
         });
 
@@ -62,6 +82,7 @@ export default function Replicator() {
         });
 
         socket.on('frame_received', (data) => {
+            console.log("📸 Frame received on client");
             setFrames([data.image]); 
             setStatusMessage("Optical Data Synced.");
         });
@@ -79,8 +100,12 @@ export default function Replicator() {
             setStatusMessage("Neural Mesh Compiled.");
         });
 
+        socket.on('connect_error', (err) => {
+            console.error("❌ Connection Error:", err.message);
+        });
+
         return () => { socket.disconnect(); };
-    }, [sessionId, isMobile]);
+    }, []);
 
     const compressImage = (file: File): Promise<string> => {
         return new Promise((resolve) => {
@@ -126,6 +151,15 @@ export default function Replicator() {
         }
     };
 
+    // 5. LOADING STATE (Prevents Hydration Mismatch)
+    if (!isMounted) {
+        return (
+            <div className="bg-black min-h-screen flex items-center justify-center text-white">
+                 <Loader2 className="animate-spin text-cyan-500" size={48} />
+            </div>
+        );
+    }
+
     // --- MOBILE SENSOR UI ---
     if (isMobile) {
         return (
@@ -145,6 +179,7 @@ export default function Replicator() {
         );
     }
 
+    // --- DESKTOP UI ---
     return (
         <div className="bg-zinc-950 min-h-screen text-white">
             <Header />
@@ -207,7 +242,7 @@ export default function Replicator() {
                         </div>
                     </div>
 
-                    {/* RIGHT COLUMN: DISPLAY (REFACTORED LOGIC) */}
+                    {/* RIGHT COLUMN: DISPLAY */}
                     <div className="flex justify-center h-96">
                         <div className="w-full max-w-md h-full bg-zinc-900/30 border border-zinc-800 rounded-[3rem] relative overflow-hidden flex items-center justify-center">
                             
