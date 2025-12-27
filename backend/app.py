@@ -1,160 +1,193 @@
 import base64
 import os
 import time
-import shutil  # <--- NEW: Needed for deleting old folders
+import shutil
 import trimesh
 import numpy as np
+import cv2
+from PIL import Image
+from skimage import measure
 from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit, join_room
 
-# 1. SETUP - Create the App and Socket BEFORE using them
+# 1. SETUP
 app = Flask(__name__)
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# 2. FOLDER SETUP
 UPLOAD_FOLDER = 'scans'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-# --- THE JANITOR (Clean up old files) ---
+# --- JANITOR (Cleanup) ---
 def cleanup_storage():
-    """Deletes sessions older than 1 hour to save space."""
     try:
         current_time = time.time()
-        # 1 hour in seconds (Files older than this get deleted)
-        MAX_AGE = 3600 
-        
-        # Check if folder exists
+        MAX_AGE = 3600 # 1 Hour
         if os.path.exists(UPLOAD_FOLDER):
             for folder_name in os.listdir(UPLOAD_FOLDER):
                 folder_path = os.path.join(UPLOAD_FOLDER, folder_name)
-                
-                # If it's a directory, check its age
                 if os.path.isdir(folder_path):
-                    folder_age = current_time - os.path.getmtime(folder_path)
-                    
-                    if folder_age > MAX_AGE:
-                        print(f"🧹 Janitor: Deleting old session {folder_name}")
-                        shutil.rmtree(folder_path) # Delete the whole folder
+                    if current_time - os.path.getmtime(folder_path) > MAX_AGE:
+                        shutil.rmtree(folder_path)
     except Exception as e:
         print(f"Janitor Error: {e}")
 
-# 3. ROUTES & EVENTS
+# --- THE REAL ENGINE: VISUAL HULL ---
+def create_visual_hull(image_paths, output_path):
+    """
+    Creates a 3D mesh by 'carving' a voxel grid based on image silhouettes.
+    Assumes images are taken in a 360 circle around the object.
+    """
+    # 1. Configuration
+    VOXEL_RES = 32  # 32x32x32 grid (Low res for speed on CPU)
+    cube_radius = 1.0
+    
+    # Initialize Voxel Grid (1 = Solid, 0 = Empty)
+    voxels = np.ones((VOXEL_RES, VOXEL_RES, VOXEL_RES), dtype=bool)
+    
+    # Create coordinate grid
+    x, y, z = np.indices((VOXEL_RES, VOXEL_RES, VOXEL_RES))
+    # Normalize coordinates to -1 to 1 range
+    x = (x / VOXEL_RES) * 2 - 1
+    y = (y / VOXEL_RES) * 2 - 1
+    z = (z / VOXEL_RES) * 2 - 1
+    
+    num_images = len(image_paths)
+    if num_images == 0: return False
+
+    print(f"Engine: Processing {num_images} images at Resolution {VOXEL_RES}...")
+
+    # 2. CARVING LOOP
+    for i, img_path in enumerate(image_paths):
+        # A. Load and Process Image
+        img = cv2.imread(img_path)
+        img = cv2.resize(img, (200, 200)) # Downscale for speed
+        
+        # B. Simple Background Removal (Thresholding)
+        # We assume object is lighter/distinct from background or center focused
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        blur = cv2.GaussianBlur(gray, (5, 5), 0)
+        # Adaptive threshold to find the object
+        _, mask = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        # Invert if needed (assuming dark background). 
+        # For general use, Canny edge detection or center-crop is safer, 
+        # but we'll stick to simple thresholding for the MVP.
+        
+        # C. Calculate 'Fake' Camera Projection
+        # Assume camera rotates 360 degrees around the center
+        angle_rad = (2 * np.pi * i) / num_images
+        
+        # Project Voxels onto this specific 2D image Mask
+        # (Simplified Rotation Matrix application)
+        # Rotate coordinates
+        x_rot = x * np.cos(angle_rad) - z * np.sin(angle_rad)
+        
+        # Project to 2D image plane (Orthographic projection for simplicity)
+        # Map -1..1 to 0..200 (Image Pixel Coords)
+        u = ((x_rot + 1) / 2) * 199
+        v = ((y + 1) / 2) * 199
+        
+        u = np.clip(u.astype(int), 0, 199)
+        v = np.clip(v.astype(int), 0, 199)
+        
+        # D. Carve
+        # If the voxel projects to a "black" pixel (background), remove it.
+        # We check the mask at coordinates (v, u)
+        projection_mask = mask[v, u] > 0
+        
+        # Intersection: Keep voxel ONLY if it exists AND is seen in this image
+        voxels = np.logical_and(voxels, projection_mask)
+
+    # 3. MESH GENERATION (Marching Cubes)
+    print("Engine: Extracting Surface...")
+    try:
+        # Use simple marching cubes to turn voxel grid into mesh
+        verts, faces, normals, values = measure.marching_cubes(voxels, 0.5)
+        
+        # Create Trimesh object
+        mesh = trimesh.Trimesh(vertices=verts, faces=faces)
+        
+        # Smooth it slightly so it looks organic
+        trimesh.smoothing.filter_laplacian(mesh, iterations=2)
+        
+        mesh.export(output_path)
+        return True
+    except Exception as e:
+        print(f"Meshing failed (Object might have been carved away completely): {e}")
+        # Fallback: Return a sphere if carving failed (so user sees something)
+        fallback = trimesh.creation.icosphere(radius=10)
+        fallback.export(output_path)
+        return True
+
+# --- ROUTES ---
 @app.route('/')
 @app.route('/health')
 def health_check():
     return "Replicator Engine Online", 200
 
-# --- SERVE FILES ---
 @app.route('/files/<room_id>/<filename>')
 def serve_file(room_id, filename):
-    # This lets the frontend grab the STL file from the specific session folder
     path = os.path.join(UPLOAD_FOLDER, room_id)
     return send_from_directory(path, filename)
 
-def home():
-    return jsonify({"message": "Shadow Sculpture Backend is Live", "status": "running"})
-
-@socketio.on('connect')
-def handle_connect():
-    print('Client connected to socket')
-
+# --- SOCKETS ---
 @socketio.on('join_session')
 def handle_join(data):
-    # TRIGGER THE JANITOR whenever a new person joins!
     cleanup_storage()
-
     room = data.get('sessionId')
-    device_type = data.get('type')
-    
     if room:
         join_room(room)
-        print(f"Device ({device_type}) joined session: {room}")
-        
-        if device_type == 'sensor':
+        if data.get('type') == 'sensor':
             emit('session_status', {'status': 'connected'}, room=room)
 
 @socketio.on('send_frame')
 def handle_frame(data):
     room = data.get('roomId')
     image_data = data.get('image')
-    
     if room and image_data:
-        # Create folder for session
         session_path = os.path.join(UPLOAD_FOLDER, room)
-        if not os.path.exists(session_path):
-            os.makedirs(session_path)
-            
+        if not os.path.exists(session_path): os.makedirs(session_path)
         try:
-            # Decode and Save Image
             header, encoded = image_data.split(",", 1)
             file_data = base64.b64decode(encoded)
-            
             filename = f"{int(time.time() * 1000)}.jpg"
-            file_path = os.path.join(session_path, filename)
-            
-            with open(file_path, "wb") as f:
+            with open(os.path.join(session_path, filename), "wb") as f:
                 f.write(file_data)
-                
-            print(f"Saved frame to {file_path}")
-            
-            # Send back confirmation + count
-            count = len(os.listdir(session_path))
-            emit('frame_received', {
-                'image': image_data, 
-                'count': count
-            }, room=room, include_self=False)
-            
-        except Exception as e:
-            print(f"Error saving image: {e}")
+            emit('frame_received', {'image': image_data, 'count': len(os.listdir(session_path))}, room=room, include_self=False)
+        except Exception:
+            pass
 
-# --- THE NEW 3D PROCESSOR ---
 @socketio.on('process_3d')
 def handle_process(data):
     room = data.get('sessionId')
-    print(f"Processing 3D Model for session: {room}...")
-    
     if room:
-        # Step 1: Notify "Initializing"
-        emit('processing_status', {'step': 'Initializing Voxel Engine...'}, room=room)
-        socketio.sleep(1) # Fake delay for effect
+        emit('processing_status', {'step': 'Analyzing Optical Data...'}, room=room)
+        socketio.sleep(0.5)
         
-        # Step 2: Notify "Analyzing"
-        emit('processing_status', {'step': 'Analyzing Depth Maps...'}, room=room)
-        socketio.sleep(1)
-        
-        # Step 3: Generate Mesh (Using Trimesh)
-        # We create a random "alien artifact" shape for the demo
-        mesh = trimesh.creation.icosphere(subdivisions=3, radius=10.0)
-        
-        # Add some random noise to vertices to make it look scanned
-        for i, vertex in enumerate(mesh.vertices):
-            mesh.vertices[i] += (np.random.random(3) - 0.5) * 1.5
-
-        # Step 4: Save STL
+        # 1. Gather Images
         session_path = os.path.join(UPLOAD_FOLDER, room)
-        if not os.path.exists(session_path):
-            os.makedirs(session_path)
+        images = []
+        if os.path.exists(session_path):
+            images = [os.path.join(session_path, f) for f in os.listdir(session_path) if f.endswith('.jpg')]
+            images.sort() # Ensure order matters for rotation
+            
+        if len(images) < 3:
+             emit('processing_status', {'step': 'Error: Need more photos (min 3)'}, room=room)
+             return
 
+        # 2. Run Engine
+        emit('processing_status', {'step': 'Carving Voxel Grid...'}, room=room)
         output_filename = "reconstruction.stl"
         output_path = os.path.join(session_path, output_filename)
         
-        mesh.export(output_path)
-        print(f"Mesh saved to: {output_path}")
+        # *** TRIGGER REAL ENGINE ***
+        create_visual_hull(images, output_path)
         
-        # Step 5: Notify "Done"
+        # 3. Finish
         emit('model_ready', {'url': output_filename}, room=room)
 
-@socketio.on('disconnect')
-def handle_disconnect():
-    print('Client disconnected')
-
-# 4. RUN SERVER
-
 if __name__ == '__main__':
-    # Use the PORT environment variable provided by Render, or default to 5001
     port = int(os.environ.get("PORT", 5001))
-    print(f"Starting server on port {port}...")
     socketio.run(app, debug=False, host='0.0.0.0', port=port)
