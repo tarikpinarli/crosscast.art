@@ -3,14 +3,13 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
 import { Camera, Activity, CheckCircle2 } from 'lucide-react';
+import { useParams } from 'react-router-dom';
 
 // ⚠️ FIX: Point directly to Render, not "/"
-const SOCKET_URL = "https://replicator-backend.onrender.com";
+const SOCKET_URL = import.meta.env.VITE_BACKEND_URL || "https://your-app-name.onrender.com";
 
 export default function MobileSensor() {
-  const [searchParams] = useSearchParams();
-  // Get ID from ?session=XYZ to match index.tsx QR code
-  const id = searchParams.get('session');
+  const { id } = useParams(); // This grabs the ID from the URL path /sensor/XYZ
   
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);

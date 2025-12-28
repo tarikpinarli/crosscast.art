@@ -3,6 +3,7 @@ import { Canvas, useLoader } from '@react-three/fiber';
 import { OrbitControls, Stage, Center } from '@react-three/drei';
 import { GLTFLoader } from 'three-stdlib';
 
+
 interface ModelViewerProps {
   url: string;
 }

@@ -12,7 +12,7 @@ export const QrHandshake = ({ sessionId, host }: QrHandshakeProps) => {
   // Priority: Use the passed 'host' (IP address for dev), 
   // otherwise fallback to window.location.origin (for Prod).
   const baseUrl = host || (typeof window !== 'undefined' ? window.location.origin : '');
-  const joinLink = `${baseUrl}/replicator?session=${sessionId}`;
+  const joinLink = `${baseUrl}/sensor/${sessionId}`;
 
   return (
     <div className="flex flex-col items-center justify-center p-12 border border-zinc-800 bg-zinc-900/50 rounded-[3rem] relative overflow-hidden group">
