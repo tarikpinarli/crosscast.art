@@ -5,10 +5,11 @@ import { Header } from '../../components/layout/Header';
 import { Footer } from '../../components/layout/Footer';
 import { QrHandshake } from './components/QrHandshake';
 import { ModelViewer } from './components/ModelViewer';
-import { Cpu, ScanLine, Smartphone, Box, Loader2, Download, Camera } from 'lucide-react';
+import { PaymentModal } from '../../components/PaymentModal'; //
+import { usePayment } from '../../hooks/usePayment'; //
+import { Cpu, ScanLine, Smartphone, Box, Loader2, Download, Camera, Lock } from 'lucide-react';
 
 // --- CONFIGURATION ---
-// UPDATED: Now defaults to your Render URL if the ENV variable is missing
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "https://replicator-backend.onrender.com";
 
 const FRONTEND_HOST = import.meta.env.PROD
@@ -29,14 +30,16 @@ export default function Replicator() {
     const [modelReady, setModelReady] = useState(false);
     const [modelUrl, setModelUrl] = useState<string | null>(null);
 
+    // 3. PAYMENT HOOK
+    const { showModal, clientSecret, startCheckout, closeModal } = usePayment('replicator-export');
+
     const socketRef = useRef<Socket | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // 3. INITIALIZATION (Runs once on mount)
+    // 4. INITIALIZATION (Runs once on mount)
     useEffect(() => {
         setIsMounted(true);
         
-        // Check URL only AFTER mounting to prevent Server/Client mismatch
         const queryParams = new URLSearchParams(window.location.search);
         const urlSessionId = queryParams.get('session');
         
@@ -54,9 +57,8 @@ export default function Replicator() {
 
         console.log("🔌 Connecting to Backend:", BACKEND_URL);
         
-        // UPDATED: Connection options for better stability
         const socket = io(BACKEND_URL, {
-            transports: ['websocket', 'polling'], // Prioritize websocket
+            transports: ['websocket', 'polling'], 
             reconnectionAttempts: 10,
             forceNew: true,
         });
@@ -89,7 +91,6 @@ export default function Replicator() {
         socket.on('model_ready', (data) => {
             setIsProcessing(false);
             setModelReady(true);
-            // Ensure we construct the full URL for the model
             const fullModelUrl = data.url.startsWith('http') ? data.url : `${BACKEND_URL}/files/${currentSession}/${data.url}`;
             setModelUrl(fullModelUrl);
             setStatusMessage("Neural Mesh Compiled.");
@@ -98,7 +99,7 @@ export default function Replicator() {
         return () => { socket.disconnect(); };
     }, []);
 
-    // 4. IMAGE COMPRESSION
+    // 5. IMAGE COMPRESSION
     const compressImage = (file: File): Promise<string> => {
         return new Promise((resolve) => {
             const reader = new FileReader();
@@ -146,7 +147,42 @@ export default function Replicator() {
         if (socketRef.current) socketRef.current.emit('process_3d', { sessionId });
     };
 
-    // 5. LOADING STATE
+    // 6. DOWNLOAD HANDLER
+    const handleDownload = async () => {
+        if (!modelUrl) return;
+        try {
+            // Fetch the file as a blob to handle it internally
+            const response = await fetch(modelUrl);
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            
+            // Create temporary link
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `replicator_scan_${sessionId}.glb`;
+            document.body.appendChild(link);
+            link.click();
+            
+            // Cleanup
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            closeModal();
+        } catch (err) {
+            console.error("Download failed:", err);
+            alert("Download failed. Please try again.");
+        }
+    };
+
+    // 7. MAIN ACTION BUTTON HANDLER
+    const handleMainAction = () => {
+        if (!modelReady) {
+            handleGenerate();
+        } else {
+            startCheckout();
+        }
+    };
+
+    // LOADING STATE
     if (!isMounted) {
         return <div className="bg-black min-h-screen" />;
     }
@@ -187,6 +223,7 @@ export default function Replicator() {
                 <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
                     {/* LEFT COLUMN: CONTROLS */}
                     <div className="space-y-8">
+                        {/* STEP 1 */}
                         <div className={`flex gap-4 items-start ${isConnected ? 'opacity-100' : 'opacity-50'}`}>
                             <div className={`p-3 rounded-lg border ${isConnected ? 'bg-emerald-500/10 border-emerald-500 text-emerald-500' : 'bg-zinc-900 border-zinc-800 text-cyan-500'}`}>
                                 <Smartphone size={24} />
@@ -199,6 +236,7 @@ export default function Replicator() {
                             </div>
                         </div>
 
+                        {/* STEP 2 */}
                         <div className={`flex gap-4 items-start ${frames.length > 0 ? 'opacity-100' : 'opacity-50'}`}>
                             <div className={`p-3 rounded-lg border ${frames.length > 0 ? 'bg-cyan-500/10 border-cyan-500 text-cyan-500' : 'bg-zinc-900 border-zinc-800 text-zinc-500'}`}>
                                 <ScanLine size={24} />
@@ -211,22 +249,37 @@ export default function Replicator() {
                             </div>
                         </div>
 
+                        {/* STEP 3 / ACTION BUTTON */}
                         <div className={`transition-all duration-500 ${frames.length >= 1 ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
                             <button
-                                onClick={handleGenerate}
-                                disabled={isProcessing || modelReady}
+                                onClick={handleMainAction}
+                                disabled={isProcessing}
                                 className={`group flex gap-4 items-center px-6 py-4 rounded-xl transition-all shadow-xl w-full max-w-sm
-                                ${modelReady ? 'bg-emerald-500 text-black' : 'bg-white text-black hover:bg-cyan-500 hover:scale-105'}`}
+                                ${modelReady 
+                                    ? 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_30px_rgba(16,185,129,0.4)]' 
+                                    : 'bg-white text-black hover:bg-cyan-500 hover:scale-105'
+                                }`}
                             >
                                 <div className="p-2 bg-black text-white rounded-lg">
-                                    {isProcessing ? <Loader2 className="animate-spin" size={24} /> : (modelReady ? <Download size={24} /> : <Box size={24} />)}
+                                    {isProcessing ? (
+                                        <Loader2 className="animate-spin" size={24} />
+                                    ) : modelReady ? (
+                                        <Lock size={24} /> // Lock icon to indicate payment required
+                                    ) : (
+                                        <Box size={24} />
+                                    )}
                                 </div>
                                 <div className="text-left">
                                     <h3 className="text-lg font-black uppercase italic leading-none">
-                                        {isProcessing ? "Computing..." : (modelReady ? "Ready to Print" : "3. Compile Mesh")}
+                                        {isProcessing 
+                                            ? "Computing..." 
+                                            : modelReady 
+                                                ? "Unlock & Export" 
+                                                : "3. Compile Mesh"
+                                        }
                                     </h3>
-                                    <p className="text-[10px] font-bold uppercase tracking-widest mt-1">
-                                        {statusMessage || "Begin AI Reconstruction"}
+                                    <p className="text-[10px] font-bold uppercase tracking-widest mt-1 opacity-80">
+                                        {statusMessage || (modelReady ? "Secure Download Available" : "Begin AI Reconstruction")}
                                     </p>
                                 </div>
                             </button>
@@ -273,6 +326,18 @@ export default function Replicator() {
                     </div>
                 </div>
             </div>
+
+            {/* PAYMENT MODAL INTEGRATION */}
+            {showModal && (
+                <PaymentModal 
+                    clientSecret={clientSecret} 
+                    onClose={closeModal} 
+                    onSuccess={handleDownload} 
+                    color="cyan" 
+                    price="$2.99" 
+                />
+            )}
+            
             <Footer />
         </div>
     );
