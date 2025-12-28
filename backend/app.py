@@ -112,9 +112,8 @@ def handle_process(data):
         emit('processing_status', {'step': 'Simulating Neural Mesh... (TEST MODE)'}, room=room)
         socketio.sleep(1.5)
         
-        # Uses a public test GLB (A Duck) so you don't need to generate anything
-        # You can replace this URL with any public GLB url
-        TEST_MODEL_URL = "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Duck/glTF-Binary/Duck.glb"
+        # UPDATED LINK: Using raw.githack.com to fix the CORS/Blocking error
+        TEST_MODEL_URL = "https://raw.githack.com/KhronosGroup/glTF-Sample-Models/master/2.0/Duck/glTF-Binary/Duck.glb"
         
         emit('model_ready', {'url': TEST_MODEL_URL}, room=room)
         print("✅ Mock Model Sent")

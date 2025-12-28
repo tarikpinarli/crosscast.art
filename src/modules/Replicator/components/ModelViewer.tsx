@@ -1,20 +1,15 @@
-import React, { Suspense, useEffect } from 'react';
+import React, { Suspense } from 'react';
 import { Canvas, useLoader } from '@react-three/fiber';
 import { OrbitControls, Stage, Center } from '@react-three/drei';
 import { GLTFLoader } from 'three-stdlib';
-
 
 interface ModelViewerProps {
   url: string;
 }
 
 function Model({ url }: { url: string }) {
-  // We use the loader manager to inject the Ngrok bypass header into the XHR request
-  const gltf = useLoader(GLTFLoader, url, (loader) => {
-    loader.setRequestHeader({
-      'ngrok-skip-browser-warning': '69420'
-    });
-  });
+  // CLEAN LOADER: No custom headers causing CORS issues
+  const gltf = useLoader(GLTFLoader, url);
 
   return (
     <primitive 
