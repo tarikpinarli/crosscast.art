@@ -11,3 +11,4 @@ scikit-image
 Pillow
 requests
 python-dotenv
+stripe

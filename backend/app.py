@@ -2,110 +2,57 @@ import os
 import time
 import requests
 import base64
-from flask import Flask, send_from_directory, jsonify
+import stripe # <--- ENSURE 'stripe' IS IN requirements.txt
+from flask import Flask, send_from_directory, jsonify, request
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit, join_room
 from dotenv import load_dotenv
 from pathlib import Path
 
 # --- CONFIG ---
-# Load env if local, otherwise skip (Render handles this via Dashboard)
 env_path = Path(__file__).resolve().parent.parent / '.env'
 if env_path.exists():
     load_dotenv(dotenv_path=env_path)
 
 TRIPO_API_KEY = os.environ.get("TRIPO_API_KEY")
 IMGBB_API_KEY = os.environ.get("IMGBB_API_KEY")
+STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY")
+
+# Setup Stripe
+if STRIPE_SECRET_KEY:
+    stripe.api_key = STRIPE_SECRET_KEY
+
 UPLOAD_FOLDER = 'scans'
 
 app = Flask(__name__)
 
 # --- CORS SETUP ---
-# Allow all origins, methods, and headers for Vercel/Frontend access
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 socketio = SocketIO(app, cors_allowed_origins="*", ping_timeout=60, async_mode='eventlet')
 
 if not os.path.exists(UPLOAD_FOLDER): os.makedirs(UPLOAD_FOLDER)
 
-# --- NEW PING ROUTE ---
+# --- ROUTES ---
+
 @app.route('/ping', methods=['GET'])
 def ping_server():
     return "pong", 200
 
-# --- HELPER FUNCTIONS ---
-def upload_to_imgbb(local_path):
+# PAYMENT ROUTE
+@app.route('/create-payment-intent', methods=['POST'])
+def create_payment():
     try:
-        with open(local_path, "rb") as file:
-            img_base64 = base64.b64encode(file.read()).decode('utf-8')
-        payload = {"key": IMGBB_API_KEY, "image": img_base64}
-        response = requests.post("https://api.imgbb.com/1/upload", data=payload)
-        res_json = response.json()
-        if response.status_code == 200 and res_json.get('success'):
-            return res_json['data']['url']
-        return None
+        # 299 = $2.99
+        intent = stripe.PaymentIntent.create(
+            amount=299,
+            currency='usd',
+            automatic_payment_methods={'enabled': True},
+        )
+        return jsonify({'clientSecret': intent['client_secret']})
     except Exception as e:
-        print(f"💥 ImgBB Error: {e}")
-        return None
-
-def generate_mesh_tripo(image_url, output_path):
-    headers = {
-        "Authorization": f"Bearer {TRIPO_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
-    payload = {
-        "type": "image_to_model",
-        "file": {
-            "type": "jpg",
-            "url": image_url
-        }
-    }
-    
-    print(f"📡 Tripo: Submitting task for {image_url}")
-    try:
-        response = requests.post("https://api.tripo3d.ai/v2/openapi/task", json=payload, headers=headers)
-        res_data = response.json()
-        
-        if res_data.get('code') != 0:
-            return f"ERR_{res_data.get('code')}"
-            
-        task_id = res_data['data']['task_id']
-        print(f"✅ Task ID: {task_id}. Polling...")
-
-        for _ in range(120): 
-            socketio.sleep(4)
-            status_res = requests.get(f"https://api.tripo3d.ai/v2/openapi/task/{task_id}", headers=headers).json()
-            
-            if status_res.get('code') != 0: continue
-            
-            task_data = status_res.get('data', {})
-            status = task_data.get('status')
-            
-            print(f"⏳ Progress: {task_data.get('progress', 0)}% | Status: {status}")
-            
-            if status == "success":
-                output = task_data.get('output', {})
-                model_url = output.get('model') or output.get('pbr_model') or output.get('base_model')
-                
-                if not model_url:
-                    return "URL_NOT_FOUND"
-
-                print(f"📦 Downloading finalized model...")
-                r = requests.get(model_url)
-                with open(output_path, 'wb') as f: 
-                    f.write(r.content)
-                return "SUCCESS"
-            
-            if status in ["failed", "banned", "expired", "cancelled"]:
-                return status.upper()
-                
-    except Exception as e:
-        print(f"💥 Backend Error: {e}")
-        return "CRASH"
-    return "TIMEOUT"
-
-# --- ROUTES & SOCKETS ---
+        print(f"💰 Payment Error: {e}")
+        return jsonify(error=str(e)), 403
 
 @app.route('/files/<room_id>/<filename>')
 def serve_file(room_id, filename):
@@ -115,15 +62,14 @@ def serve_file(room_id, filename):
     except Exception as e:
         return str(e), 404
 
+# --- SOCKET HANDLERS ---
+
 @socketio.on('join_session')
 def handle_join(data):
     room = data.get('sessionId')
-    user_type = data.get('type') # 'host' or 'sensor'
-    
+    user_type = data.get('type')
     join_room(room)
     print(f"🔗 {user_type} joined room: {room}")
-    
-    # FIX: If the mobile sensor joins, explicitly tell the desktop!
     if user_type == 'sensor':
         emit('session_status', {'status': 'connected'}, room=room)
 
@@ -147,10 +93,34 @@ def handle_process(data):
     session_path = os.path.join(UPLOAD_FOLDER, room)
     local_img_path = os.path.join(session_path, "capture.jpg")
     
+    # ==========================================
+    # 🛠️ TEST MODE SWITCH
+    # Set to True to save credits. Set to False for real AI.
+    TEST_MODE = True 
+    # ==========================================
+
     if not os.path.exists(local_img_path):
         emit('processing_status', {'step': 'Error: No image found'}, room=room)
         return
 
+    if TEST_MODE:
+        # --- MOCK FLOW (Free) ---
+        print(f"⚠️ TEST MODE ACTIVE: Skipping Tripo for session {room}")
+        emit('processing_status', {'step': 'Simulating Cloud Uplink... (TEST MODE)'}, room=room)
+        socketio.sleep(1.5)
+        
+        emit('processing_status', {'step': 'Simulating Neural Mesh... (TEST MODE)'}, room=room)
+        socketio.sleep(1.5)
+        
+        # Uses a public test GLB (A Duck) so you don't need to generate anything
+        # You can replace this URL with any public GLB url
+        TEST_MODEL_URL = "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Duck/glTF-Binary/Duck.glb"
+        
+        emit('model_ready', {'url': TEST_MODEL_URL}, room=room)
+        print("✅ Mock Model Sent")
+        return
+
+    # --- REAL FLOW (Costs Credits) ---
     emit('processing_status', {'step': 'Cloud Uplink Active...'}, room=room)
     public_url = upload_to_imgbb(local_img_path)
     
@@ -166,7 +136,60 @@ def handle_process(data):
     else:
         emit('processing_status', {'step': f'Failed: {result}'}, room=room)
 
+# --- HELPERS ---
+
+def upload_to_imgbb(local_path):
+    try:
+        with open(local_path, "rb") as file:
+            img_base64 = base64.b64encode(file.read()).decode('utf-8')
+        payload = {"key": IMGBB_API_KEY, "image": img_base64}
+        response = requests.post("https://api.imgbb.com/1/upload", data=payload)
+        res_json = response.json()
+        if response.status_code == 200 and res_json.get('success'):
+            return res_json['data']['url']
+        return None
+    except Exception as e:
+        print(f"💥 ImgBB Error: {e}")
+        return None
+
+def generate_mesh_tripo(image_url, output_path):
+    headers = {
+        "Authorization": f"Bearer {TRIPO_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "type": "image_to_model",
+        "file": {
+            "type": "jpg",
+            "url": image_url
+        }
+    }
+    try:
+        response = requests.post("https://api.tripo3d.ai/v2/openapi/task", json=payload, headers=headers)
+        res_data = response.json()
+        if res_data.get('code') != 0: return f"ERR_{res_data.get('code')}"
+        task_id = res_data['data']['task_id']
+        
+        for _ in range(120): 
+            socketio.sleep(4)
+            status_res = requests.get(f"https://api.tripo3d.ai/v2/openapi/task/{task_id}", headers=headers).json()
+            if status_res.get('code') != 0: continue
+            task_data = status_res.get('data', {})
+            status = task_data.get('status')
+            
+            if status == "success":
+                output = task_data.get('output', {})
+                model_url = output.get('model') or output.get('pbr_model') or output.get('base_model')
+                if not model_url: return "URL_NOT_FOUND"
+                r = requests.get(model_url)
+                with open(output_path, 'wb') as f: f.write(r.content)
+                return "SUCCESS"
+            if status in ["failed", "banned", "expired", "cancelled"]: return status.upper()
+    except Exception as e:
+        print(f"💥 Backend Error: {e}")
+        return "CRASH"
+    return "TIMEOUT"
+
 if __name__ == '__main__':
-    # Render provides PORT via environment variable
     port = int(os.environ.get("PORT", 5005))
     socketio.run(app, debug=False, host='0.0.0.0', port=port)
