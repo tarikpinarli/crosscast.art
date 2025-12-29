@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { io, Socket } from 'socket.io-client';
-import { Header } from '../../components/layout/Header';
-import { Footer } from '../../components/layout/Footer';
-import { QrHandshake } from './components/QrHandshake';
-import { ModelViewer } from './components/ModelViewer';
-import { PaymentModal } from '../../components/PaymentModal';
-import { usePayment } from '../../hooks/usePayment';
+import { Header } from '../../../components/layout/Header';
+import { Footer } from '../../../components/layout/Footer';
+import { QrHandshake } from '../components/QrHandshake';
+import { ModelViewer } from '../components/ModelViewer';
+import { PaymentModal } from '../../../components/PaymentModal';
+import { usePayment } from '../../../hooks/usePayment';
 import { Cpu, ScanLine, Smartphone, Box, Loader2, Download, Camera, Lock, AlertTriangle, XCircle } from 'lucide-react';
 
 // --- CONFIGURATION ---

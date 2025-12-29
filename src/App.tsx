@@ -15,7 +15,7 @@ import WallArtModule from './modules/WallArt';
 import IntersectionModule from './modules/Intersection';
 
 // --- NEW REPLICATOR MODULE ---
-import Replicator from './modules/Replicator';
+import Replicator from './modules/Replicator/ReplicatorSystem';
 import MobileSensor from './modules/Replicator/MobileSensor';
 
 // --- UTILS ---
