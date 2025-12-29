@@ -2,7 +2,7 @@ import os
 import time
 import requests
 import base64
-import stripe # <--- ENSURE 'stripe' IS IN requirements.txt
+import stripe 
 from flask import Flask, send_from_directory, jsonify, request
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit, join_room
@@ -38,6 +38,25 @@ if not os.path.exists(UPLOAD_FOLDER): os.makedirs(UPLOAD_FOLDER)
 @app.route('/ping', methods=['GET'])
 def ping_server():
     return "pong", 200
+
+# NEW: PRE-PAYMENT CREDIT CHECK ROUTE
+@app.route('/check-availability', methods=['GET'])
+def check_availability():
+    """
+    Checks if there are enough credits (>= 30) in Tripo.
+    Even in Test Mode, we check the real balance as requested.
+    """
+    try:
+        credits_available = check_tripo_credits()
+        # We need at least 30 credits
+        if credits_available >= 30:
+            return jsonify({'available': True, 'balance': credits_available})
+        else:
+            return jsonify({'available': False, 'reason': 'insufficient_credits'}), 200 # Return 200 but available: false
+    except Exception as e:
+        print(f"⚠️ Credit Check Error: {e}")
+        # If API fails, better to say unavailable than take money and fail
+        return jsonify({'available': False, 'reason': 'api_error'}), 200
 
 # PAYMENT ROUTE
 @app.route('/create-payment-intent', methods=['POST'])
@@ -89,6 +108,7 @@ def handle_frame(data):
 
 @socketio.on('process_3d')
 def handle_process(data):
+    # This is now triggered ONLY after successful payment
     room = data.get('sessionId')
     session_path = os.path.join(UPLOAD_FOLDER, room)
     local_img_path = os.path.join(session_path, "capture.jpg")
@@ -106,9 +126,8 @@ def handle_process(data):
     if TEST_MODE:
         # --- MOCK FLOW (Free) ---
         print(f"⚠️ TEST MODE ACTIVE: Skipping Tripo for session {room}")
-        emit('processing_status', {'step': 'Simulating Cloud Uplink... (TEST MODE)'}, room=room)
-        socketio.sleep(1.5)
-        
+        emit('processing_status', {'step': 'Payment Verified. Initializing... (TEST)'}, room=room)
+        socketio.sleep(1.0)
         emit('processing_status', {'step': 'Simulating Neural Mesh... (TEST MODE)'}, room=room)
         socketio.sleep(1.5)
         
@@ -120,14 +139,14 @@ def handle_process(data):
         return
 
     # --- REAL FLOW (Costs Credits) ---
-    emit('processing_status', {'step': 'Cloud Uplink Active...'}, room=room)
+    emit('processing_status', {'step': 'Payment Verified. Uploading to Cloud...'}, room=room)
     public_url = upload_to_imgbb(local_img_path)
     
     if not public_url:
         emit('processing_status', {'step': 'Error: Cloud Sync Failed'}, room=room)
         return
 
-    emit('processing_status', {'step': 'Neural Mesh Generation...'}, room=room)
+    emit('processing_status', {'step': 'Generating Neural Mesh...'}, room=room)
     result = generate_mesh_tripo(public_url, os.path.join(session_path, "reconstruction.glb"))
     
     if result == "SUCCESS":
@@ -136,6 +155,34 @@ def handle_process(data):
         emit('processing_status', {'step': f'Failed: {result}'}, room=room)
 
 # --- HELPERS ---
+
+def check_tripo_credits():
+    """
+    Queries Tripo API to check user balance.
+    Returns integer of credits.
+    """
+    headers = {
+        "Authorization": f"Bearer {TRIPO_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    try:
+        # Assuming standard endpoint /user/balance. 
+        # If Tripo API differs, update this URL.
+        response = requests.get("https://api.tripo3d.ai/v2/openapi/user/balance", headers=headers)
+        data = response.json()
+        
+        if data.get('code') == 0:
+            # Tripo usually returns balance in string or int in 'data' object
+            # Structure usually: { "code": 0, "data": { "balance": "100" } }
+            balance = int(data['data'].get('balance', 0))
+            print(f"💳 Current Tripo Balance: {balance}")
+            return balance
+        else:
+            print(f"⚠️ Failed to fetch balance: {data}")
+            return 0
+    except Exception as e:
+        print(f"💥 Credit Check API Error: {e}")
+        return 0
 
 def upload_to_imgbb(local_path):
     try:

@@ -5,9 +5,9 @@ import { Header } from '../../components/layout/Header';
 import { Footer } from '../../components/layout/Footer';
 import { QrHandshake } from './components/QrHandshake';
 import { ModelViewer } from './components/ModelViewer';
-import { PaymentModal } from '../../components/PaymentModal'; //
-import { usePayment } from '../../hooks/usePayment'; //
-import { Cpu, ScanLine, Smartphone, Box, Loader2, Download, Camera, Lock } from 'lucide-react';
+import { PaymentModal } from '../../components/PaymentModal';
+import { usePayment } from '../../hooks/usePayment';
+import { Cpu, ScanLine, Smartphone, Box, Loader2, Download, Camera, Lock, AlertTriangle, XCircle } from 'lucide-react';
 
 // --- CONFIGURATION ---
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "https://replicator-backend.onrender.com";
@@ -25,6 +25,10 @@ export default function Replicator() {
     const [isMobile, setIsMobile] = useState(false);
     const [isConnected, setIsConnected] = useState(false);
     const [frames, setFrames] = useState<string[]>([]);
+    
+    // Workflow States
+    const [isCheckingCredits, setIsCheckingCredits] = useState(false);
+    const [serversBusy, setServersBusy] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [statusMessage, setStatusMessage] = useState("");
     const [modelReady, setModelReady] = useState(false);
@@ -143,42 +147,73 @@ export default function Replicator() {
         }
     };
 
-    const handleGenerate = () => {
-        if (socketRef.current) socketRef.current.emit('process_3d', { sessionId });
+    // 6. GENERATION & PAYMENT HANDLERS
+    
+    // Helper to start the actual generation via Socket
+    const triggerGeneration = () => {
+        if (socketRef.current) {
+            setStatusMessage("Payment Confirmed. Starting Engine...");
+            socketRef.current.emit('process_3d', { sessionId });
+        }
     };
 
-    // 6. DOWNLOAD HANDLER
+    // Callback when payment is successful
+    const handlePaymentSuccess = () => {
+        closeModal();
+        triggerGeneration();
+    };
+
+    // The logic to check credits before asking for payment
+    const checkCreditsAndInitialize = async () => {
+        setIsCheckingCredits(true);
+        try {
+            const response = await fetch(`${BACKEND_URL}/check-availability`);
+            const data = await response.json();
+            
+            if (data.available) {
+                // Good to go -> Show Payment
+                setServersBusy(false);
+                startCheckout();
+            } else {
+                // Not enough credits or error -> Show Busy Message
+                setServersBusy(true);
+            }
+        } catch (error) {
+            console.error("Availability Check Failed:", error);
+            setServersBusy(true); // Default to busy if network fails
+        } finally {
+            setIsCheckingCredits(false);
+        }
+    };
+
+    // 7. DOWNLOAD HANDLER (Free now, because they paid upfront)
     const handleDownload = async () => {
         if (!modelUrl) return;
         try {
-            // Fetch the file as a blob to handle it internally
             const response = await fetch(modelUrl);
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
-            
-            // Create temporary link
             const link = document.createElement('a');
             link.href = url;
             link.download = `replicator_scan_${sessionId}.glb`;
             document.body.appendChild(link);
             link.click();
-            
-            // Cleanup
             document.body.removeChild(link);
             window.URL.revokeObjectURL(url);
-            closeModal();
         } catch (err) {
             console.error("Download failed:", err);
             alert("Download failed. Please try again.");
         }
     };
 
-    // 7. MAIN ACTION BUTTON HANDLER
+    // 8. MAIN ACTION BUTTON LOGIC
     const handleMainAction = () => {
-        if (!modelReady) {
-            handleGenerate();
+        if (modelReady) {
+            // Already generated + paid -> Download
+            handleDownload();
         } else {
-            startCheckout();
+            // New request -> Check credits -> Pay -> Generate
+            checkCreditsAndInitialize();
         }
     };
 
@@ -253,33 +288,42 @@ export default function Replicator() {
                         <div className={`transition-all duration-500 ${frames.length >= 1 ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
                             <button
                                 onClick={handleMainAction}
-                                disabled={isProcessing}
+                                disabled={isProcessing || isCheckingCredits || serversBusy}
                                 className={`group flex gap-4 items-center px-6 py-4 rounded-xl transition-all shadow-xl w-full max-w-sm
                                 ${modelReady 
                                     ? 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_30px_rgba(16,185,129,0.4)]' 
-                                    : 'bg-white text-black hover:bg-cyan-500 hover:scale-105'
+                                    : serversBusy
+                                        ? 'bg-red-500/10 border border-red-500 cursor-not-allowed'
+                                        : 'bg-white text-black hover:bg-cyan-500 hover:scale-105'
                                 }`}
                             >
-                                <div className="p-2 bg-black text-white rounded-lg">
-                                    {isProcessing ? (
+                                <div className={`p-2 rounded-lg ${serversBusy ? 'text-red-500' : 'bg-black text-white'}`}>
+                                    {isProcessing || isCheckingCredits ? (
                                         <Loader2 className="animate-spin" size={24} />
+                                    ) : serversBusy ? (
+                                        <XCircle size={24} />
                                     ) : modelReady ? (
-                                        <Lock size={24} /> // Lock icon to indicate payment required
+                                        <Download size={24} />
                                     ) : (
-                                        <Box size={24} />
+                                        <Lock size={24} /> 
                                     )}
                                 </div>
                                 <div className="text-left">
-                                    <h3 className="text-lg font-black uppercase italic leading-none">
-                                        {isProcessing 
-                                            ? "Computing..." 
-                                            : modelReady 
-                                                ? "Unlock & Export" 
-                                                : "3. Compile Mesh"
-                                        }
+                                    <h3 className={`text-lg font-black uppercase italic leading-none ${serversBusy ? 'text-red-500' : ''}`}>
+                                        {isCheckingCredits
+                                            ? "Verifying Capacity..."
+                                            : isProcessing 
+                                                ? "Generating Mesh..." 
+                                                : serversBusy
+                                                    ? "Servers Busy"
+                                                    : modelReady 
+                                                        ? "Download Model" 
+                                                        : "3. Generate Mesh"}
                                     </h3>
-                                    <p className="text-[10px] font-bold uppercase tracking-widest mt-1 opacity-80">
-                                        {statusMessage || (modelReady ? "Secure Download Available" : "Begin AI Reconstruction")}
+                                    <p className={`text-[10px] font-bold uppercase tracking-widest mt-1 opacity-80 ${serversBusy ? 'text-red-400' : ''}`}>
+                                        {serversBusy 
+                                            ? "High Traffic - Try Later" 
+                                            : statusMessage || (modelReady ? "Ready for Export" : "Secure Payment Gateway")}
                                     </p>
                                 </div>
                             </button>
@@ -290,6 +334,18 @@ export default function Replicator() {
                     <div className="flex justify-center h-96">
                         <div className="w-full max-w-md h-full bg-zinc-900/30 border border-zinc-800 rounded-[3rem] relative overflow-hidden flex items-center justify-center">
                             
+                            {/* Busy Overlay */}
+                            {serversBusy && (
+                                <div className="absolute inset-0 bg-black/80 z-20 flex flex-col items-center justify-center text-center p-6 animate-in fade-in">
+                                    <AlertTriangle className="text-red-500 w-16 h-16 mb-4" />
+                                    <h3 className="text-xl font-bold text-white uppercase mb-2">Capacity Reached</h3>
+                                    <p className="text-zinc-400 text-xs">Our high-performance compute nodes are currently full. Please try again in a few minutes.</p>
+                                    <button onClick={() => setServersBusy(false)} className="mt-6 text-xs uppercase font-bold text-white underline">
+                                        Dismiss
+                                    </button>
+                                </div>
+                            )}
+
                             {modelReady && modelUrl ? (
                                 <div className="w-full h-full relative animate-in fade-in zoom-in duration-1000">
                                     <ModelViewer url={modelUrl} />
@@ -328,11 +384,12 @@ export default function Replicator() {
             </div>
 
             {/* PAYMENT MODAL INTEGRATION */}
+            {/* Note: onSuccess now triggers generation instead of download */}
             {showModal && (
                 <PaymentModal 
                     clientSecret={clientSecret} 
                     onClose={closeModal} 
-                    onSuccess={handleDownload} 
+                    onSuccess={handlePaymentSuccess} 
                     color="cyan" 
                     price="$2.99" 
                 />
