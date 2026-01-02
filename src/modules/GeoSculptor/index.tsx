@@ -9,7 +9,8 @@ import {
     MapPin, 
     ScanLine, 
     Waypoints, 
-    Square 
+    Square,
+    CheckCircle2 // Added for unlocked status
 } from 'lucide-react';
 import * as THREE from 'three';
 import { STLExporter } from 'three-stdlib';
@@ -27,7 +28,7 @@ import { fetchRoadsGeometry } from '../../utils/geo/fetchRoads';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
-// --- SIDEBAR SEARCH COMPONENT ---
+// --- SIDEBAR SEARCH COMPONENT (Unchanged) ---
 const SidebarSearch = ({ onSelect }: { onSelect: (lat: number, lon: number) => void }) => {
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<any[]>([]);
@@ -131,6 +132,9 @@ export default function GeoSculptorModule() {
   // --- STATE ---
   const [mode, setMode] = useState<'SELECT' | 'VIEW'>('SELECT');
   
+  // NEW: Session Access State
+  const [hasAccess, setHasAccess] = useState(false);
+
   // Model Data
   const [modelData, setModelData] = useState<{ 
       buildings: THREE.BufferGeometry | null, 
@@ -242,7 +246,7 @@ export default function GeoSculptorModule() {
   }, [isCityMode, isRoadsEnabled]); 
 
   // --- 2. EXPORT LOGIC ---
-  const handleDownload = () => {
+  const performDownload = () => {
     if (!modelData) return;
     
     const group = new THREE.Group();
@@ -261,20 +265,51 @@ export default function GeoSculptorModule() {
     link.download = `geo_sculptor_${Date.now()}.stl`; 
     link.click();
     
-    closeModal();
+    URL.revokeObjectURL(url);
+  };
+
+  // The Gatekeeper
+  const handleExportRequest = () => {
+      if (!modelData) return;
+
+      if (hasAccess) {
+          // Already paid -> Download immediately
+          performDownload();
+      } else {
+          // Not paid -> Open Modal
+          startCheckout();
+      }
+  };
+
+  // Payment Success Handler
+  const handlePaymentSuccess = () => {
+      setHasAccess(true); // Unlock session
+      performDownload();  // Trigger download
+      closeModal();       // Close modal
   };
 
   return (
     <>
       <ModuleLayout
         title="Terra-Former"
-        subtitle="Topographic Generator"
-        color="cyan"
+        subtitle={hasAccess ? "UNLOCKED // SESSION ACTIVE" : "Topographic Generator"}
+        color={hasAccess ? "emerald" : "cyan"} // Green when unlocked
         canExport={!!modelData && mode === 'VIEW' && !isProcessing}
-        onExport={startCheckout}
+        onExport={handleExportRequest} // Use gatekeeper
         sidebar={
           <div className="space-y-6">
             
+            {/* NEW: Session Status */}
+            {hasAccess && (
+                <div className="bg-emerald-500/10 border border-emerald-500/50 p-3 rounded-sm flex items-center gap-3 animate-in fade-in">
+                    <CheckCircle2 size={16} className="text-emerald-500" />
+                    <div>
+                        <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Session Unlocked</p>
+                        <p className="text-[9px] text-zinc-500 uppercase">Downloads are free until refresh</p>
+                    </div>
+                </div>
+            )}
+
             {mode === 'VIEW' && (
                 <button 
                     onClick={handleReset}
@@ -385,11 +420,13 @@ export default function GeoSculptorModule() {
         <PaymentModal 
             clientSecret={clientSecret} 
             onClose={closeModal} 
-            onSuccess={handleDownload} 
+            onSuccess={handlePaymentSuccess} // New success handler
             color="cyan" 
             price="$1.99" 
         />
       )}
+      {/* TAILWIND SAFELIST: Forces cyan loader classes to exist */}
+      <div className="hidden border-cyan-500/20 border-t-cyan-500 bg-cyan-500/20 text-cyan-500/60"></div>
     </>
   );
 }

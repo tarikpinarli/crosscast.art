@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Upload, Zap, Ruler, Grid as GridIcon, Activity, Sliders } from 'lucide-react';
+import { Upload, Zap, Ruler, Grid as GridIcon, Activity, Sliders, CheckCircle2 } from 'lucide-react'; // Added CheckCircle2
 import { Viewer3D } from './Viewer3D';
 import { createMask, getAlignedImageData, generateVoxelGeometry, exportToSTL } from '../../utils/voxelEngine';
 import * as THREE from 'three';
@@ -20,6 +20,9 @@ export default function IntersectionModule() {
   const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   
+  // --- NEW: Session Access State ---
+  const [hasAccess, setHasAccess] = useState(false);
+
   // 3. Parameters
   const [artisticMode, setArtisticMode] = useState(false);
   const [smoothingIterations, setSmoothingIterations] = useState(3);
@@ -56,26 +59,58 @@ export default function IntersectionModule() {
     return () => clearTimeout(timer);
   }, [imgA, imgB, artisticMode, smoothingIterations, threshold, physicalHeight, gridSize, lightDistance, processGeometry]);
 
-  const handleDownload = () => {
+  // --- NEW: Helper for Downloading (Separated from Payment) ---
+  const performDownload = () => {
     if (!geometry) return;
     const blob = exportToSTL(geometry);
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url; link.download = `shadow-sculpture.stl`; link.click();
     URL.revokeObjectURL(url);
-    closeModal();
+  };
+
+  // --- NEW: The Gatekeeper Function ---
+  const handleExportRequest = () => {
+    if (!geometry) return;
+
+    if (hasAccess) {
+        // Already paid this session -> Immediate Download
+        performDownload();
+    } else {
+        // Not paid -> Open Payment Modal
+        startCheckout();
+    }
+  };
+
+  // --- NEW: Success Handler ---
+  const handlePaymentSuccess = () => {
+    setHasAccess(true); // Unlock session
+    performDownload();  // Download the file
+    closeModal();       // Close modal
   };
 
   return (
     <>
       <ModuleLayout
         title="Shadow Sculptor"
-        subtitle="Intersection Engine v1.0"
-        color="cyan"
+        subtitle={hasAccess ? "UNLOCKED // SESSION ACTIVE" : "Intersection Engine v1.0"}
+        color={hasAccess ? "emerald" : "cyan"} // Green if unlocked
         canExport={!!geometry}
-        onExport={startCheckout}
+        onExport={handleExportRequest} // Use gatekeeper instead of direct checkout
         sidebar={
           <div className="space-y-6">
+            
+            {/* --- NEW: Session Status Indicator --- */}
+            {hasAccess && (
+                <div className="bg-emerald-500/10 border border-emerald-500/50 p-3 rounded flex items-center gap-3 animate-in fade-in">
+                    <CheckCircle2 size={16} className="text-emerald-500" />
+                    <div>
+                        <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Session Unlocked</p>
+                        <p className="text-[9px] text-zinc-500 uppercase">Downloads are free until refresh</p>
+                    </div>
+                </div>
+            )}
+
             {/* Uploads */}
             <div className="grid grid-cols-2 gap-3">
                <label className={`h-28 border cursor-pointer flex flex-col items-center justify-center overflow-hidden transition-all ${imgA ? 'border-cyan-400 bg-zinc-900/40' : 'border-cyan-500/30 bg-cyan-950/10 hover:bg-cyan-900/20'}`}>
@@ -135,11 +170,13 @@ export default function IntersectionModule() {
         <PaymentModal 
           clientSecret={clientSecret} 
           onClose={closeModal} 
-          onSuccess={handleDownload} 
+          onSuccess={handlePaymentSuccess} // Point to the new success handler
           color="cyan"
           price="$0.99"
         />
       )}
+    {/* TAILWIND SAFELIST: Forces cyan loader classes to exist */}
+      <div className="hidden border-cyan-500/20 border-t-cyan-500 bg-cyan-500/20 text-cyan-500/60"></div>
     </>
   );
 }

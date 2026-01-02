@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Upload, Box, Activity, Scaling, Layers, Maximize2, Grid as GridIcon } from 'lucide-react';
+import { Upload, Box, Activity, Scaling, Layers, Maximize2, Grid as GridIcon, CheckCircle2 } from 'lucide-react';
 import { WallArtView } from './WallArtView'; 
 import { generateReliefGeometry, ReliefConfig, exportToSTL } from '../../utils/reliefEngine';
 import * as THREE from 'three';
 
-// --- NEW SYSTEM IMPORTS ---
+// --- SYSTEM IMPORTS ---
 import { ModuleLayout } from '../../components/layout/ModuleLayout';
 import { CyberSlider } from '../../components/ui/CyberSlider';
 import { PaymentModal } from '../../components/PaymentModal';
@@ -21,7 +21,7 @@ const WALL_COLORS = [
 ];
 
 export default function WallArtModule() {
-  // 1. Logic Hook (Replaces 50 lines of fetch/stripe code)
+  // 1. Payment Hook
   const { showModal, clientSecret, startCheckout, closeModal } = usePayment('wall-art-basic');
 
   // 2. Core State
@@ -29,6 +29,9 @@ export default function WallArtModule() {
   const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   
+  // --- NEW: Session Access State ---
+  const [hasAccess, setHasAccess] = useState(false);
+
   // 3. Parameters
   const [heightCM, setHeightCM] = useState(25);
   const [aspectRatio, setAspectRatio] = useState(1);
@@ -72,14 +75,32 @@ export default function WallArtModule() {
     return () => clearTimeout(timer);
   }, [processGeometry, image]);
 
-  const handleDownload = () => {
+  // --- EXPORT LOGIC ---
+  const performDownload = () => {
     if (!geometry) return;
     const blob = exportToSTL(geometry);
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url; link.download = `pixel-relief.stl`; link.click();
     URL.revokeObjectURL(url);
-    closeModal();
+  };
+
+  // 1. Gatekeeper Function
+  const handleExportRequest = () => {
+      if (!geometry) return;
+
+      if (hasAccess) {
+          performDownload();
+      } else {
+          startCheckout();
+      }
+  };
+
+  // 2. Success Handler
+  const handlePaymentSuccess = () => {
+      setHasAccess(true); // Unlock session
+      performDownload();  // Trigger download
+      closeModal();       // Close modal
   };
 
   // --- THE VIEW ---
@@ -87,12 +108,24 @@ export default function WallArtModule() {
     <>
       <ModuleLayout
         title="Pixel Relief Engine"
-        subtitle="Solid Core Mesher v2.1"
-        color="purple"
+        subtitle={hasAccess ? "UNLOCKED // SESSION ACTIVE" : "Solid Core Mesher v2.1"}
+        color={hasAccess ? "emerald" : "purple"} // Green when unlocked
         canExport={!!geometry}
-        onExport={startCheckout} // Hook handles the API call!
+        onExport={handleExportRequest} // Use gatekeeper
         sidebar={
           <div className="space-y-6">
+            
+            {/* NEW: Session Status */}
+            {hasAccess && (
+                <div className="bg-emerald-500/10 border border-emerald-500/50 p-3 rounded-sm flex items-center gap-3 animate-in fade-in">
+                    <CheckCircle2 size={16} className="text-emerald-500" />
+                    <div>
+                        <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Session Unlocked</p>
+                        <p className="text-[9px] text-zinc-500 uppercase">Downloads are free until refresh</p>
+                    </div>
+                </div>
+            )}
+
             {/* Upload */}
             <label className={`group relative h-48 border transition-all duration-500 cursor-pointer flex flex-col items-center justify-center overflow-hidden ${image ? 'border-purple-400 bg-zinc-900/40' : 'border-purple-500/30 bg-purple-950/10 hover:bg-purple-900/20'}`}>
                 <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
@@ -122,7 +155,7 @@ export default function WallArtModule() {
               value={threshold} 
               onChange={setThreshold} 
               min={0} max={255} 
-              color="purple"
+              color="purple" 
               tooltip="Cutoff point. Pixels darker than this value are removed. Increase to clean up background noise."
             />
 
@@ -132,7 +165,7 @@ export default function WallArtModule() {
               value={depth} 
               onChange={setDepth} 
               min={0.1} max={10} step={0.1} unit="cm" 
-              color="purple"
+              color="purple" 
               tooltip="Extrusion thickness. How far the art 'pops out' from the base plane."
             />
 
@@ -142,7 +175,7 @@ export default function WallArtModule() {
               value={heightCM} 
               onChange={setHeightCM} 
               min={5} max={50} unit="cm" 
-              color="purple"
+              color="purple" 
               tooltip="Target physical height for 3D printing. Width scales automatically to maintain aspect ratio."
             />
 
@@ -170,11 +203,14 @@ export default function WallArtModule() {
         <PaymentModal 
           clientSecret={clientSecret} 
           onClose={closeModal} 
-          onSuccess={handleDownload} 
+          onSuccess={handlePaymentSuccess} 
           color="purple"
           price="$0.99"
         />
       )}
+
+      {/* TAILWIND SAFELIST: Forces purple loader classes to exist */}
+      <div className="hidden border-purple-500/20 border-t-purple-500 bg-purple-500/20 text-purple-500/60 bg-purple-900/20 border-purple-400/50 from-purple-900/10"></div>
     </>
   );
 }
