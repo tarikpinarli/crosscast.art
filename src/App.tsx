@@ -27,16 +27,17 @@ function ScrollToTop() {
   return null;
 }
 
-// --- BACKEND WARM-UP ---
-const BACKEND_URL = "https://shadow-sculpture-backend.onrender.com";
+const BACKEND_URL = "https://replicator-backend.onrender.com"; 
 
 function App() {
   useEffect(() => {
     const warmUp = async () => {
       try {
-        await fetch("https://uncadenced-eerily-ivonne.ngrok-free.dev/health");
-      } catch (e) {
+        // ✅ Ping the real server, not ngrok
+        await fetch(`${BACKEND_URL}/ping`); 
         console.log("📡 Server wake-up signal sent.");
+      } catch (e) {
+        console.log("Wake-up failed (silent fail).");
       }
     };
     warmUp();
