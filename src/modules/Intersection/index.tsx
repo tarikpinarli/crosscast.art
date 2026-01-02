@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Upload, Zap, Ruler, Grid as GridIcon, Activity, Sliders, CheckCircle2 } from 'lucide-react'; // Added CheckCircle2
 import { Viewer3D } from './Viewer3D';
-import { createMask, getAlignedImageData, generateVoxelGeometry, exportToSTL } from '../../utils/voxelEngine';
+import { createMask, getAlignedImageData, generateVoxelGeometry, exportToSTL } from '../../utils/intersection/voxelEngine';
 import * as THREE from 'three';
 
 // --- NEW SYSTEM IMPORTS ---

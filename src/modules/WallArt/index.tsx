@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Upload, Box, Activity, Scaling, Layers, Maximize2, Grid as GridIcon, CheckCircle2 } from 'lucide-react';
 import { WallArtView } from './WallArtView'; 
-import { generateReliefGeometry, ReliefConfig, exportToSTL } from '../../utils/reliefEngine';
+import { generateReliefGeometry, ReliefConfig, exportToSTL } from '../../utils/WallArt/reliefEngine';
 import * as THREE from 'three';
 
 // --- SYSTEM IMPORTS ---

@@ -32,7 +32,7 @@ export default function Replicator() {
     const [modelUrl, setModelUrl] = useState<string | null>(null);
 
     // 3. PAYMENT HOOK
-    const { showModal, clientSecret, startCheckout, closeModal } = usePayment('replicator-export');
+    const { showModal, clientSecret, startCheckout, closeModal } = usePayment('replicator-model');
 
     const socketRef = useRef<Socket | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);

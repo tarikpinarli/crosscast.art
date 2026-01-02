@@ -38,7 +38,7 @@ def handle_process(data):
     # ==========================================
     # 🛠️ TEST MODE SWITCH
     # Set to True to save credits. Set to False for real AI.
-    TEST_MODE = False 
+    TEST_MODE = True 
     # ==========================================
 
     if not os.path.exists(local_img_path):
