@@ -25,7 +25,7 @@ def check_availability():
     try:
         credits_available = check_tripo_credits()
         # We need at least 30 credits
-        if credits_available >= 40:
+        if credits_available >= 400:
             return jsonify({'available': True, 'balance': credits_available})
         else:
             return jsonify({'available': False, 'reason': 'insufficient_credits'}), 200 
