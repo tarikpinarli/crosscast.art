@@ -9,10 +9,12 @@ import Pricing from './pages/Pricing';
 import Hub from './pages/Hub';
 import Showcase from './pages/Showcase';
 
+
 // --- TOOL MODULES ---
 import GeoSculptorModule from './modules/GeoSculptor';
 import WallArtModule from './modules/WallArt';
 import IntersectionModule from './modules/Intersection';
+import ResonanceModule from './modules/Resonance';
 
 // --- NEW REPLICATOR MODULE ---
 import Replicator from './modules/Replicator/ReplicatorSystem';
@@ -61,6 +63,7 @@ function App() {
           <Route path="/wall-art" element={<WallArtModule />} />
           <Route path="/app/intersection" element={<IntersectionModule />} />
           <Route path="/hub" element={<Hub />} />
+          <Route path="/resonance" element={<ResonanceModule />} />
 
           {/* REPLICATOR ENGINE (New) */}
           <Route path="/replicator" element={<Replicator />} />

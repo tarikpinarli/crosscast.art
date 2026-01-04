@@ -12,7 +12,8 @@ MODULE_PRICES = {
   'intersection-basic': 99,    # $0.99
   'wall-art-basic': 99,       # $0.99
   'geo-sculptor-basic': 199,  # $1.99
-  'replicator-model': 299     # $2.99 (Adding your 3D model price here too)
+  'replicator-model': 299,     # $2.99 (Adding your 3D model price here too)
+  'resonance-basic': 99
 }
 
 @api.route('/ping', methods=['GET'])
