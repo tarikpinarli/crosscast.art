@@ -3,7 +3,7 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Stage, PerspectiveCamera, useGLTF, useProgress, Html } from '@react-three/drei';
 import { Header } from '../components/layout/Header';
 import { Footer } from '../components/layout/Footer';
-import { ExternalLink, Ruler, Mountain, Copy, X, BoxSelect } from 'lucide-react';
+import { ExternalLink, Ruler, Mountain, Copy, X, BoxSelect, AudioLines } from 'lucide-react';
 
 // --- DATA CONFIGURATION ---
 const SHOWCASE_DATA = [
@@ -17,7 +17,7 @@ const SHOWCASE_DATA = [
         stat: "1.2M Vertices",
         desc: "High-density topographic print of Lower Manhattan. Built from satellite telemetry.",
         image: "/showcase_page_images/newyork.png",
-        modelUrl: "/models/nyc.glb", // Pointing to your new GLB
+        modelUrl: "/models/nyc.glb",
         tags: ["PLA", "0.4mm Nozzle"]
       },
     ]
@@ -32,8 +32,23 @@ const SHOWCASE_DATA = [
         stat: "Zero-Error Mesh",
         desc: "An optical illusion sculpture projecting two distinct shapes.",
         image: "/showcase_page_images/dual.png", 
-        modelUrl: "/models/dual.glb", // Update this one once converted
+        modelUrl: "/models/dual.glb",
         tags: ["Resin", "SLA"]
+      }
+    ]
+  },
+  {
+    moduleName: "Resonance",
+    engineId: "resonance",
+    icon: AudioLines,
+    projects: [
+      {
+        title: "Voice Totem",
+        stat: "64-Band FFT",
+        desc: "A physical manifestation of a spoken phrase, visualizing frequency over time.",
+        image: "/showcase_page_images/dual.png", // PLACEHOLDER
+        modelUrl: "/models/dual.glb", // PLACEHOLDER - Change when you have a glb
+        tags: ["PLA", "Matte"]
       }
     ]
   }
@@ -61,7 +76,6 @@ function Loader() {
 
 function Model({ url }: { url: string }) {
   const { scene } = useGLTF(url);
-  // We clone the scene to avoid reference issues if the same model is opened twice
   return (
     <primitive 
       object={scene.clone()} 

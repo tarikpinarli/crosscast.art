@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Copy, Box, Mountain, ArrowRight, Zap, Shield, Cpu, Activity } from 'lucide-react';
+import { Copy, Box, Mountain, ArrowRight, Zap, Shield, Cpu, Activity, AudioLines } from 'lucide-react';
 import { Header } from '../components/layout/Header';
 import { Footer } from '../components/layout/Footer';
 
@@ -37,6 +37,17 @@ const PROTOCOLS = [
     path: '/geo',
     color: 'cyan',
     video: '/module_videos/building_top.mov'
+  },
+  {
+    id: 'resonance',
+    name: 'Resonance',
+    version: 'v1.0',
+    desc: 'Acoustic geometry synthesis. Transform voice recordings and audio files into physical frequency landscapes.',
+    specs: ['FFT Analysis', 'Waveform Trim', 'Solid Base'],
+    icon: AudioLines,
+    path: '/resonance',
+    color: 'purple',
+    video: '/module_videos/resonance_preview.mov' // Placeholder video path
   }
 ];
 
@@ -69,9 +80,9 @@ export default function Hub() {
             <Link 
               key={mod.id} 
               to={mod.path}
-              className="group relative flex flex-col lg:flex-row bg-zinc-900/40 border border-zinc-800 rounded-2xl overflow-hidden hover:border-cyan-500/50 hover:bg-zinc-900/60 transition-all duration-500 active:scale-[0.98] md:active:scale-100"
+              className={`group relative flex flex-col lg:flex-row bg-zinc-900/40 border border-zinc-800 rounded-2xl overflow-hidden hover:border-${mod.color}-500/50 hover:bg-zinc-900/60 transition-all duration-500 active:scale-[0.98] md:active:scale-100`}
             >
-              {/* Video Preview Side - Adjusted height for mobile */}
+              {/* Video Preview Side */}
               <div className="lg:w-1/3 h-48 sm:h-64 lg:h-auto relative overflow-hidden border-b lg:border-b-0 lg:border-r border-zinc-800">
                 <video 
                     autoPlay 
@@ -79,13 +90,8 @@ export default function Hub() {
                     muted 
                     playsInline 
                     className="w-full h-full object-cover transition-all duration-700 
-                      /* Mobile State: Full color and brighter */
                       grayscale-0 opacity-80 scale-100
-                      
-                      /* Desktop State: Grayscale and dimmed until hover */
                       md:grayscale md:opacity-40 md:scale-105
-                      
-                      /* Desktop Hover State */
                       md:group-hover:grayscale-0 md:group-hover:opacity-100 md:group-hover:scale-100"
                   >
                     <source src={mod.video} type="video/mp4" />
@@ -101,16 +107,16 @@ export default function Hub() {
               <div className="flex-1 p-6 md:p-8 flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-3">
-                    <h2 className="text-2xl md:text-3xl font-black uppercase italic tracking-tight group-hover:text-cyan-400 transition-colors">
+                    <h2 className={`text-2xl md:text-3xl font-black uppercase italic tracking-tight group-hover:text-${mod.color}-400 transition-colors`}>
                       {mod.name}
                     </h2>
-                    <Zap size={16} className="text-zinc-700 group-hover:text-cyan-500 transition-colors hidden sm:block" />
+                    <Zap size={16} className={`text-zinc-700 group-hover:text-${mod.color}-500 transition-colors hidden sm:block`} />
                   </div>
                   <p className="text-zinc-400 text-xs md:text-sm leading-relaxed max-w-2xl mb-6">
                     {mod.desc}
                   </p>
                   
-                  {/* Specs Tags - More scrollable/wrappable on mobile */}
+                  {/* Specs Tags */}
                   <div className="flex flex-wrap gap-2 mb-8">
                     {mod.specs.map(spec => (
                       <span key={spec} className="px-2.5 py-1 bg-zinc-950 border border-zinc-800 rounded-lg text-[8px] md:text-[9px] font-bold uppercase tracking-tighter text-zinc-500">
@@ -120,7 +126,7 @@ export default function Hub() {
                   </div>
                 </div>
 
-                {/* Status Bar - Responsive Flex */}
+                {/* Status Bar */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pt-6 border-t border-white/5 gap-4">
                   <div className="flex items-center gap-4 md:gap-6">
                     <div className="flex items-center gap-2">
@@ -128,12 +134,12 @@ export default function Hub() {
                        <span className="text-[8px] md:text-[9px] font-bold uppercase text-zinc-600">Secure</span>
                     </div>
                     <div className="flex items-center gap-2">
-                       <Cpu size={10} className="text-cyan-500" />
+                       <Cpu size={10} className={`text-${mod.color}-500`} />
                        <span className="text-[8px] md:text-[9px] font-bold uppercase text-zinc-600">Optimized</span>
                     </div>
                   </div>
                   
-                  <div className="w-full sm:w-auto flex items-center justify-between sm:justify-end gap-2 text-[10px] md:text-xs font-black uppercase tracking-[0.2em] group-hover:translate-x-1 md:group-hover:translate-x-2 transition-transform text-cyan-500 sm:text-white sm:group-hover:text-cyan-500">
+                  <div className={`w-full sm:w-auto flex items-center justify-between sm:justify-end gap-2 text-[10px] md:text-xs font-black uppercase tracking-[0.2em] group-hover:translate-x-1 md:group-hover:translate-x-2 transition-transform text-${mod.color}-500 sm:text-white sm:group-hover:text-${mod.color}-500`}>
                     <span className="sm:inline">Initialize Protocol</span>
                     <ArrowRight size={16} />
                   </div>

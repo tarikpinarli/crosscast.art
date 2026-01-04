@@ -1,6 +1,6 @@
 import React from 'react';
 import { Header } from '../components/layout/Header';
-import { Terminal, Database, GitBranch, Cpu, Activity, Zap, Box, Layers } from 'lucide-react';
+import { Terminal, Database, GitBranch, Cpu, Activity, Zap, Box, Layers, AudioLines } from 'lucide-react';
 import { Footer } from '../components/layout/Footer';
 
 export default function Technology() {
@@ -18,6 +18,13 @@ export default function Technology() {
       icon: Database,
       color: "text-purple-500",
       label: "Engine: Terra-Former"
+    },
+    {
+      title: "Spectral FFT Analysis",
+      desc: "The Resonance engine uses Fast Fourier Transform (FFT) algorithms to decompose audio signals into component frequencies. This spectral data is mapped to a 3D heightfield in real-time, generating a manifold mesh that represents sound over time.",
+      icon: AudioLines,
+      color: "text-purple-500",
+      label: "Engine: Resonance"
     },
     {
       title: "Manifold Mesh Validation",
@@ -108,9 +115,6 @@ export default function Technology() {
               </div>
            </div>
         </div>
-
-        {/* Accompanying image of 3D printing slicing and mesh analysis */}
-        
 
         {/* Footer System Status */}
         <div className="mt-20 py-6 border-y border-zinc-900 flex justify-between items-center px-4">

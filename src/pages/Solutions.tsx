@@ -1,7 +1,7 @@
 import React from 'react';
-import { Link } from 'react-router-dom'; // Added Link for routing
+import { Link } from 'react-router-dom';
 import { Header } from '../components/layout/Header';
-import { Zap, ShoppingBag, Palette, Gift, ArrowRight, Layers, Map, Camera } from 'lucide-react';
+import { Zap, ShoppingBag, Palette, Gift, ArrowRight, Layers, Map, Camera, AudioLines } from 'lucide-react';
 import { Footer } from '../components/layout/Footer';
 
 const SOLUTION_CARDS = [
@@ -10,21 +10,28 @@ const SOLUTION_CARDS = [
     desc: "Utilize our dual-silhouette intersection engine to create custom projection lamps. Perfect for unique gifts that project two distinct memories from a single object.", 
     icon: Gift,
     tag: "SHADOW CASTER",
-    path: "/app/intersection" // Added path
+    path: "/app/intersection" 
   },
   { 
     title: "Precision GIS Models", 
     desc: "Stream real-world topography via satellite telemetry. Generate 3D maps for urban planning, educational geography, or high-end office decor.", 
     icon: Map,
     tag: "TERRA-FORMER",
-    path: "/geo" // Added path
+    path: "/geo" 
   },
   { 
     title: "Tactile Photography", 
     desc: "Convert standard JPG/PNG assets into sub-millimeter depth maps. Create lithophanes and relief art that react dynamically to physical light sources.", 
     icon: Camera,
     tag: "LUMINANCE",
-    path: "/wall-art" // Added path
+    path: "/wall-art" 
+  },
+  { 
+    title: "Sonic Mementos", 
+    desc: "Capture fleeting moments in solid form. Transform voice messages, laughter, or music into tangible frequency landscapes.", 
+    icon: AudioLines,
+    tag: "RESONANCE",
+    path: "/resonance" 
   }
 ];
 
@@ -51,9 +58,9 @@ export default function Solutions() {
         </div>
 
         {/* Solutions Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 gap-4 md:gap-6">
           {SOLUTION_CARDS.map((item, i) => (
-            <Link // Changed div to Link for better SEO and UX
+            <Link 
               key={i} 
               to={item.path}
               className="group bg-zinc-900/20 border border-zinc-800/50 p-6 md:p-8 rounded-2xl hover:bg-zinc-900/60 hover:border-cyan-500/30 transition-all duration-500 active:scale-[0.98] md:active:scale-100 flex flex-col"

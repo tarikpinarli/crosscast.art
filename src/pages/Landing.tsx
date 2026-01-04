@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Copy, Box, Mountain, ArrowRight, ShieldCheck, Cpu, Activity, Zap, Layers } from 'lucide-react';
+import { Copy, Box, Mountain, ArrowRight, ShieldCheck, Cpu, Activity, Zap, Layers, AudioLines } from 'lucide-react';
 import { Header } from '../components/layout/Header';
 import { Footer } from '../components/layout/Footer';
 
@@ -8,7 +8,7 @@ const MODULES = [
   { 
     id: 'shadow', 
     name: 'Shadow Caster', 
-    desc: 'Bespoke CSG intersection logic. Calculate the volumetric overlap of dual silhouettes to generate 3D projection lamps.', 
+    desc: 'Bespoke CSG intersection logic. Calculate the volumetric overlap of dual silhouettes.', 
     icon: Copy, 
     path: '/app/intersection', 
     status: 'OPERATIONAL', 
@@ -18,7 +18,7 @@ const MODULES = [
   { 
     id: 'litho', 
     name: 'Luminance', 
-    desc: 'Advanced sub-millimeter displacement mapping. Transform high-bit-rate images into light-reactive physical relief art.', 
+    desc: 'Advanced sub-millimeter displacement mapping. Transform images into light-reactive art.', 
     icon: Box, 
     path: '/wall-art', 
     status: 'OPERATIONAL', 
@@ -28,12 +28,22 @@ const MODULES = [
   { 
     id: 'geo', 
     name: 'Terra-Former', 
-    desc: 'Streaming GIS telemetry reconstruction. Convert Mapbox elevation datasets into high-fidelity topographic models.', 
+    desc: 'Streaming GIS telemetry reconstruction. Convert elevation data into topographic models.', 
     icon: Mountain, 
     path: '/geo', 
     status: 'OPERATIONAL', 
     color: 'cyan', 
     videoOverlay: '/module_videos/building_top.mov' 
+  },
+  { 
+    id: 'resonance', 
+    name: 'Resonance', 
+    desc: 'Spectral audio analysis. Materialize sound waves into solid 3D frequency landscapes.', 
+    icon: AudioLines, 
+    path: '/resonance', 
+    status: 'NEW', 
+    color: 'purple', 
+    videoOverlay: '/module_videos/resonance_preview.mov' 
   }
 ];
 
@@ -56,7 +66,7 @@ const ManifestoSection = () => (
             </p>
           </div>
 
-          {/* Speed Card: The "Flex" */}
+          {/* Speed Card */}
           <div className="bg-cyan-500 rounded-[2.5rem] p-8 flex flex-col items-center justify-center text-center py-12 md:py-0 shadow-[0_0_50px_rgba(6,182,212,0.2)]">
             <div className="flex items-center gap-2 mb-2">
                 <Zap size={16} className="text-black animate-pulse" />
@@ -164,12 +174,12 @@ export default function Landing() {
                     </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {MODULES.map((mod) => (
                         <Link 
                           key={mod.id} 
                           to={mod.path} 
-                          className="group relative flex flex-col rounded-[2rem] overflow-hidden h-[450px] bg-zinc-900/30 border border-zinc-800/50 hover:border-cyan-500 transition-all active:scale-[0.98] md:active:scale-100"
+                          className={`group relative flex flex-col rounded-[2rem] overflow-hidden h-[450px] bg-zinc-900/30 border border-zinc-800/50 hover:border-${mod.color}-500 transition-all active:scale-[0.98] md:active:scale-100`}
                         >
                             <div className="relative h-[55%] w-full bg-zinc-950 overflow-hidden border-b border-white/5">
                                 <video 
@@ -178,15 +188,15 @@ export default function Landing() {
                                 muted 
                                 playsInline 
                                 className="w-full h-full object-cover transition-all duration-700 
-                                  grayscale-0           /* Default to color (Mobile) */
-                                  md:grayscale          /* Black and white only on Desktop */
-                                  md:group-hover:grayscale-0 /* Color on Desktop hover */
-                                  opacity-100           /* Default to visible (Mobile) */
-                                  md:opacity-40         /* Dimmer on Desktop */
-                                  md:group-hover:opacity-100 /* Bright on Desktop hover */
-                                  scale-100             /* Standard scale (Mobile) */
-                                  md:scale-110          /* Zoomed on Desktop */
-                                  md:group-hover:scale-100 /* Zoom out on Desktop hover */"
+                                  grayscale-0           
+                                  md:grayscale          
+                                  md:group-hover:grayscale-0 
+                                  opacity-100           
+                                  md:opacity-40         
+                                  md:group-hover:opacity-100 
+                                  scale-100             
+                                  md:scale-110          
+                                  md:group-hover:scale-100"
                               >
                                 <source src={mod.videoOverlay} type="video/mp4" />
                               </video>
@@ -195,10 +205,10 @@ export default function Landing() {
                             <div className="p-8 h-[45%] flex flex-col justify-between group-hover:bg-cyan-500/5 transition-colors">
                                 <div>
                                     <div className="flex justify-between items-start mb-4">
-                                        <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter group-hover:text-cyan-400">
+                                        <h3 className={`text-2xl font-black text-white uppercase italic tracking-tighter group-hover:text-${mod.color}-400`}>
                                             {mod.name}
                                         </h3>
-                                        <mod.icon size={20} className="text-zinc-700 group-hover:text-cyan-500 transition-colors"/>
+                                        <mod.icon size={20} className={`text-zinc-700 group-hover:text-${mod.color}-500 transition-colors`}/>
                                     </div>
                                     <p className="text-[11px] text-zinc-500 font-bold uppercase leading-relaxed line-clamp-2">{mod.desc}</p>
                                 </div>
@@ -210,7 +220,7 @@ export default function Landing() {
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-2 text-[10px] font-black uppercase text-white group-hover:translate-x-2 transition-transform tracking-widest">
-                                      Launch <ArrowRight size={14} className="text-cyan-500" />
+                                      Launch <ArrowRight size={14} className={`text-${mod.color}-500`} />
                                     </div>
                                 </div>
                             </div>

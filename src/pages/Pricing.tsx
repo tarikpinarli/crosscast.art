@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Header } from '../components/layout/Header';
-import { Check, Cpu, Globe, Layers, ArrowRight, Camera, Scissors, ShieldCheck, Box } from 'lucide-react';
+import { Check, Cpu, Globe, Layers, ArrowRight, Camera, Scissors, ShieldCheck, Box, AudioLines } from 'lucide-react';
 import { Footer } from '../components/layout/Footer';
 
 const MODULE_DATA = [
@@ -10,6 +10,7 @@ const MODULE_DATA = [
     name: 'Shadow Caster',
     price: '0.99',
     icon: Scissors,
+    color: 'cyan',
     desc: 'Dual-silhouette intersection engine using Constructive Solid Geometry (CSG) to merge two profiles.',
     specs: [
       'Manifold STL Export',
@@ -23,6 +24,7 @@ const MODULE_DATA = [
     name: 'Luminance',
     price: '0.99',
     icon: Camera,
+    color: 'zinc',
     desc: 'High-precision grayscale displacement mapping. Translates pixel luminance into physical Z-height.',
     specs: [
       'Sub-millimeter Surface Detail',
@@ -36,12 +38,27 @@ const MODULE_DATA = [
     name: 'Terra-Former',
     price: '1.99',
     icon: Globe,
+    color: 'cyan',
     desc: 'Real-world topographic reconstruction using global satellite elevation data (GIS).',
     specs: [
       'Mapbox GIS Telemetry',
       'Urban Block Extrusion',
       '1:1 Scale Accuracy',
       'Watertight Terrain Mesh'
+    ]
+  },
+  {
+    id: 'resonance',
+    name: 'Resonance',
+    price: '0.99',
+    icon: AudioLines,
+    color: 'purple',
+    desc: 'Audio frequency visualization. Converts spectral data into 3D printable landscapes.',
+    specs: [
+      'FFT Signal Processing',
+      'Waveform Trimming',
+      'Variable Resolution',
+      'Manifold Base Generation'
     ]
   }
 ];
@@ -64,15 +81,15 @@ export default function Pricing() {
         </div>
 
         {/* Pricing Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
           {MODULE_DATA.map((mod) => (
             <div 
               key={mod.id}
               className="flex flex-col p-8 rounded-3xl bg-zinc-900/20 border border-zinc-800 hover:border-zinc-700 transition-all duration-300 group"
             >
               <div className="mb-8">
-                <div className="w-10 h-10 bg-zinc-950 border border-zinc-800 rounded-lg flex items-center justify-center mb-6 group-hover:border-cyan-500/50 transition-colors">
-                  <mod.icon className="text-cyan-500" size={20} />
+                <div className={`w-10 h-10 bg-zinc-950 border border-zinc-800 rounded-lg flex items-center justify-center mb-6 group-hover:border-${mod.color}-500/50 transition-colors`}>
+                  <mod.icon className={`text-${mod.color}-500`} size={20} />
                 </div>
                 <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-2">
                   {mod.name} Engine
@@ -83,14 +100,14 @@ export default function Pricing() {
                 </div>
               </div>
 
-              <p className="text-zinc-400 text-[11px] leading-relaxed uppercase font-medium mb-8 h-12">
+              <p className="text-zinc-400 text-[11px] leading-relaxed uppercase font-medium mb-8 h-12 line-clamp-3">
                 {mod.desc}
               </p>
 
               <div className="space-y-4 mb-10 flex-1 border-t border-zinc-800/50 pt-6">
                 {mod.specs.map((spec) => (
                   <div key={spec} className="flex items-start gap-3">
-                    <Check size={14} className="text-cyan-500 mt-0.5" />
+                    <Check size={14} className={`text-${mod.color}-500 mt-0.5`} />
                     <span className="text-[10px] font-bold uppercase text-zinc-500 tracking-tight">{spec}</span>
                   </div>
                 ))}
@@ -106,7 +123,7 @@ export default function Pricing() {
           ))}
         </div>
 
-        {/* Manufacturing Standards - The Real Value */}
+        {/* Manufacturing Standards */}
         <div className="mt-20 border-t border-zinc-900 pt-16">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center mb-20">
             <div>
