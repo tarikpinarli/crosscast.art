@@ -1,7 +1,11 @@
-import React, { useRef, useMemo, useEffect } from 'react';
+import React, { useRef, useMemo, useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Stage, Grid, Text } from '@react-three/drei';
+import { OrbitControls, Stage, Grid, Text, PerspectiveCamera } from '@react-three/drei';
+
+// --- NEW IMPORTS (Adjust path if necessary) ---
+import { SmartCamera } from '../../../components/3d/SmartCamera';
+import { ViewToolbar } from '../../../components/ui/ViewToolbar';
 
 interface FrequencyViewProps {
     geometry: THREE.BufferGeometry | null;
@@ -11,7 +15,7 @@ interface FrequencyViewProps {
     playbackProgress: number; 
     trimStart: number;        
     trimEnd: number; 
-    length: number; // <--- NEW PROP
+    length: number;
 }
 
 interface LandscapeMeshProps {
@@ -21,43 +25,36 @@ interface LandscapeMeshProps {
     playbackProgress: number;
     trimStart: number;
     trimEnd: number;
-    length: number; // <--- NEW PROP
+    length: number;
 }
 
+// --- SHADER MESH (Unchanged) ---
 const LandscapeMesh = ({ geometry, color, isPlaying, playbackProgress, trimStart, trimEnd, length }: LandscapeMeshProps) => {
     const materialRef = useRef<any>(null);
 
-    // --- CUSTOM SHADER UNIFORMS ---
     const uniforms = useMemo(() => ({
         uTime: { value: 0 },
         uPlayhead: { value: 0 },   
         uTrimStart: { value: 0 },  
         uTrimEnd: { value: 1 },    
         uIsPlaying: { value: 0 },
-        uLength: { value: length }, // <--- Pass dynamic length here
-        uScanColor: { value: new THREE.Color('#d946ef') }, 
+        uLength: { value: length },
+        uScanColor: { value: new THREE.Color('#2e4ba437') }, 
         uBaseColor: { value: new THREE.Color(color) }
-    }), [color]); // Remove length from dep array so we update it via refs instead of re-creating uniforms
+    }), [color]);
 
-    // Update uniforms every frame
     useFrame(({ clock }) => {
         if (materialRef.current && materialRef.current.uniforms) {
             const mat = materialRef.current;
-            
             mat.uniforms.uTime.value = clock.getElapsedTime();
-            
-            // Interpolate playhead for smoothness
             mat.uniforms.uPlayhead.value = THREE.MathUtils.lerp(
                 mat.uniforms.uPlayhead.value,
                 playbackProgress,
                 0.3
             );
-            
             mat.uniforms.uIsPlaying.value = isPlaying ? 1 : 0;
             mat.uniforms.uTrimStart.value = trimStart;
             mat.uniforms.uTrimEnd.value = trimEnd;
-            
-            // DYNAMIC UPDATE: Sync shader length with Slider
             mat.uniforms.uLength.value = length; 
         }
     });
@@ -78,7 +75,7 @@ const LandscapeMesh = ({ geometry, color, isPlaying, playbackProgress, trimStart
             uniform float uTrimStart;
             uniform float uTrimEnd;
             uniform float uIsPlaying;
-            uniform float uLength; // <--- Define New Uniform
+            uniform float uLength;
             uniform vec3 uScanColor;
             uniform vec3 uBaseColor;
             varying vec3 vPosition; 
@@ -102,27 +99,16 @@ const LandscapeMesh = ({ geometry, color, isPlaying, playbackProgress, trimStart
             #include <dithering_fragment>
             
             if (uIsPlaying > 0.5) {
-                // DYNAMIC NORMALIZATION LOGIC
-                // 1. Center Offset: Half of the total length (e.g., if length is 30, offset is 15)
                 float halfLength = uLength / 2.0;
-                
-                // 2. Normalize Z position based on dynamic length
-                // (Z + 15) / 30 -> 0..1
                 float normalizedZ = (vPosition.z + halfLength) / uLength;
-                
-                // Clamp to ensure we don't glitch at edges
                 normalizedZ = clamp(normalizedZ, 0.0, 1.0);
-                
-                // Flip orientation (Audio starts at front, Time moves back)
                 normalizedZ = 1.0 - normalizedZ; 
 
-                // 3. Trim Logic
                 float meshDuration = uTrimEnd - uTrimStart;
                 float relativePlayhead = (uPlayhead - uTrimStart) / meshDuration;
                 
-                // 4. Scanline Calculation
                 float dist = abs(normalizedZ - relativePlayhead);
-                float scanline = smoothstep(0.025, 0.0, dist); // Sharp line
+                float scanline = smoothstep(0.025, 0.0, dist);
 
                 vec3 finalScanColor = mix(gl_FragColor.rgb, uScanColor, scanline);
                 gl_FragColor = vec4(finalScanColor, gl_FragColor.a);
@@ -150,6 +136,7 @@ const LandscapeMesh = ({ geometry, color, isPlaying, playbackProgress, trimStart
     );
 };
 
+// --- RECORDING VIZ (Unchanged) ---
 const RecordingViz = () => {
     return (
         <group>
@@ -166,6 +153,7 @@ const RecordingViz = () => {
     );
 };
 
+// --- MAIN COMPONENT ---
 export const FrequencyView = ({ 
     geometry, 
     isRecording, 
@@ -174,35 +162,62 @@ export const FrequencyView = ({
     playbackProgress,
     trimStart,
     trimEnd,
-    length // <--- Accept Length Prop
+    length
 }: FrequencyViewProps) => {
-    return (
-        <Canvas shadows camera={{ position: [15, 15, 15], fov: 45 }} dpr={[1, 2]}>
-            <color attach="background" args={['#09090b']} />
-            
-            <Stage environment="city" intensity={0.6} adjustCamera={false}>
-                {geometry ? (
-                    <LandscapeMesh 
-                        geometry={geometry} 
-                        color={color}
-                        isPlaying={isPlaying}
-                        playbackProgress={playbackProgress}
-                        trimStart={trimStart}
-                        trimEnd={trimEnd}
-                        length={length} // <--- Pass Length Down
-                    />
-                ) : isRecording ? (
-                    <RecordingViz />
-                ) : (
-                    <mesh rotation={[-Math.PI/2, 0, 0]}>
-                        <planeGeometry args={[10, 10, 10, 10]} />
-                        <meshBasicMaterial color="#333" wireframe />
-                    </mesh>
-                )}
-            </Stage>
+    
+    // --- 1. Camera State Setup ---
+    const [viewTrigger, setViewTrigger] = useState<{ type: string, t: number } | null>(null);
+    const controlsRef = useRef<any>(null);
 
-            <Grid position={[0, -1, 0]} args={[50, 50]} cellColor="#333" sectionColor={color} />
-            <OrbitControls autoRotate={false} />
-        </Canvas>
+    const handleViewChange = (type: string) => setViewTrigger({ type, t: Date.now() });
+
+    return (
+        // Wrapper div for relative positioning of the Toolbar
+        <div className="w-full h-full relative group">
+            
+            {/* --- 2. Reusable UI Toolbar --- */}
+            {/* Note: No 'onToggleLight' passed because this module uses fixed stage lighting */}
+            <ViewToolbar 
+                onViewChange={handleViewChange} 
+            />
+
+            <Canvas shadows dpr={[1, 2]}>
+                <color attach="background" args={['#09090b']} />
+                
+                {/* --- 3. Camera Setup --- */}
+                {/* We need an explicit PerspectiveCamera for SmartCamera to control */}
+                <PerspectiveCamera makeDefault position={[20, 20, 20]} fov={45} />
+                <OrbitControls ref={controlsRef} makeDefault autoRotate={false} />
+                
+                <SmartCamera 
+                    viewTrigger={viewTrigger} 
+                    controlsRef={controlsRef} 
+                    geometry={geometry} 
+                />
+
+                <Stage environment="city" intensity={0.6} adjustCamera={false}>
+                    {geometry ? (
+                        <LandscapeMesh 
+                            geometry={geometry} 
+                            color={color}
+                            isPlaying={isPlaying}
+                            playbackProgress={playbackProgress}
+                            trimStart={trimStart}
+                            trimEnd={trimEnd}
+                            length={length}
+                        />
+                    ) : isRecording ? (
+                        <RecordingViz />
+                    ) : (
+                        <mesh rotation={[-Math.PI/2, 0, 0]}>
+                            <planeGeometry args={[10, 10, 10, 10]} />
+                            <meshBasicMaterial color="#333" wireframe />
+                        </mesh>
+                    )}
+                </Stage>
+
+                <Grid position={[0, -1, 0]} args={[50, 50]} cellColor="#333" sectionColor={color} />
+            </Canvas>
+        </div>
     );
 };

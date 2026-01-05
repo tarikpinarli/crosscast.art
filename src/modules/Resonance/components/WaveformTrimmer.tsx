@@ -35,7 +35,7 @@ export const WaveformTrimmer = ({
                 const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
                 
                 const rawData = audioBuffer.getChannelData(0);
-                const samples = 80; // Increased resolution slightly
+                const samples = 80; 
                 const blockSize = Math.floor(rawData.length / samples);
                 const calculatedPeaks = [];
 
@@ -115,36 +115,56 @@ export const WaveformTrimmer = ({
         }
     }, [peaks, trimStart, trimEnd, playbackProgress]);
 
-    // 3. MOUSE LOGIC (FIXED)
-    const handleMouseDown = (e: React.MouseEvent) => {
-        if (!containerRef.current) return;
+    // --- SHARED CALCULATION LOGIC ---
+    const calculatePct = (clientX: number) => {
+        if (!containerRef.current) return 0;
         const rect = containerRef.current.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const pct = x / rect.width;
+        const x = clientX - rect.left;
+        return Math.max(0, Math.min(1, x / rect.width));
+    };
+
+    // --- MOUSE HANDLERS ---
+    const handleMouseDown = (e: React.MouseEvent) => {
+        const pct = calculatePct(e.clientX);
         const threshold = 0.05;
-        
         if (Math.abs(pct - trimStart) < threshold) setIsDragging('start');
         else if (Math.abs(pct - trimEnd) < threshold) setIsDragging('end');
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
-        if (!isDragging || !containerRef.current) return;
-        
-        const rect = containerRef.current.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        let pct = Math.max(0, Math.min(1, x / rect.width));
+        if (!isDragging) return;
+        const pct = calculatePct(e.clientX);
+        updateTrim(pct);
+    };
 
-        // FIX: Multiply by 100 because Parent expects 0-100 range
+    // --- TOUCH HANDLERS (FIX FOR MOBILE) ---
+    const handleTouchStart = (e: React.TouchEvent) => {
+        // Prevent scrolling while starting to drag
+        const pct = calculatePct(e.touches[0].clientX);
+        const threshold = 0.1; // Larger hit area for fingers
+        if (Math.abs(pct - trimStart) < threshold) setIsDragging('start');
+        else if (Math.abs(pct - trimEnd) < threshold) setIsDragging('end');
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (!isDragging) return;
+        // e.preventDefault(); // Stop page scrolling while dragging handle
+        const pct = calculatePct(e.touches[0].clientX);
+        updateTrim(pct);
+    };
+
+    const updateTrim = (pct: number) => {
+        // Parent expects 0-100 range
         if (isDragging === 'start') {
-            pct = Math.min(pct, trimEnd - 0.05);
-            onTrimChange(pct * 100, trimEnd * 100); 
+            const newStart = Math.min(pct, trimEnd - 0.05);
+            onTrimChange(newStart * 100, trimEnd * 100); 
         } else {
-            pct = Math.max(pct, trimStart + 0.05);
-            onTrimChange(trimStart * 100, pct * 100);
+            const newEnd = Math.max(pct, trimStart + 0.05);
+            onTrimChange(trimStart * 100, newEnd * 100);
         }
     };
 
-    const handleMouseUp = () => setIsDragging(null);
+    const handleStop = () => setIsDragging(null);
 
     return (
         <div className="bg-zinc-900/50 rounded-lg p-3 border border-white/5 space-y-2 select-none">
@@ -164,11 +184,16 @@ export const WaveformTrimmer = ({
 
                  <div 
                     ref={containerRef}
-                    className="flex-1 h-12 relative cursor-ew-resize touch-none" // touch-none helps on mobile
+                    className="flex-1 h-12 relative cursor-ew-resize touch-none"
+                    // MOUSE
                     onMouseDown={handleMouseDown}
                     onMouseMove={handleMouseMove}
-                    onMouseUp={handleMouseUp}
-                    onMouseLeave={handleMouseUp}
+                    onMouseUp={handleStop}
+                    onMouseLeave={handleStop}
+                    // TOUCH
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleStop}
                  >
                     <canvas 
                         ref={canvasRef} 
