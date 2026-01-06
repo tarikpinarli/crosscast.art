@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Upload, Zap, Ruler, Grid as GridIcon, Activity, Sliders, CheckCircle2 } from 'lucide-react'; // Added CheckCircle2
+import { Upload, Zap, Ruler, Grid as GridIcon, Activity, Sliders, CheckCircle2 } from 'lucide-react'; 
 import { Viewer3D } from './Viewer3D';
-import { createMask, getAlignedImageData, generateVoxelGeometry, exportToSTL } from '../../utils/intersection/voxelEngine';
+import { createMask, getAlignedImageData, generateVoxelGeometry } from '../../utils/intersection/voxelEngine'; // Removed exportToSTL
 import * as THREE from 'three';
+import { GLTFExporter } from 'three-stdlib'; // <--- NEW IMPORT
 
-// --- NEW SYSTEM IMPORTS ---
 import { ModuleLayout } from '../../components/layout/ModuleLayout';
 import { CyberSlider } from '../../components/ui/CyberSlider';
 import { PaymentModal } from '../../components/PaymentModal';
@@ -20,7 +20,7 @@ export default function IntersectionModule() {
   const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   
-  // --- NEW: Session Access State ---
+  // --- Session Access State ---
   const [hasAccess, setHasAccess] = useState(false);
 
   // 3. Parameters
@@ -59,30 +59,48 @@ export default function IntersectionModule() {
     return () => clearTimeout(timer);
   }, [imgA, imgB, artisticMode, smoothingIterations, threshold, physicalHeight, gridSize, lightDistance, processGeometry]);
 
-  // --- NEW: Helper for Downloading (Separated from Payment) ---
+  // --- UPDATED: GLB Export Logic ---
   const performDownload = () => {
     if (!geometry) return;
-    const blob = exportToSTL(geometry);
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url; link.download = `shadow-sculpture.stl`; link.click();
-    URL.revokeObjectURL(url);
+
+    // 1. Create a mesh for export (GLTF requires a Mesh, not just Geometry)
+    const material = new THREE.MeshStandardMaterial({ 
+        color: 0x22d3ee, // Default Cyan color for the shadow caster
+        roughness: 0.5,
+        metalness: 0.1
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+
+    // 2. Export to GLB
+    const exporter = new GLTFExporter();
+    exporter.parse(
+        mesh,
+        (gltf) => {
+            const blob = new Blob([gltf as ArrayBuffer], { type: 'model/gltf-binary' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url; 
+            link.download = `shadow-sculpture-${Date.now()}.glb`; 
+            link.click();
+            URL.revokeObjectURL(url);
+        },
+        (err) => console.error("Export Failed", err),
+        { binary: true }
+    );
   };
 
-  // --- NEW: The Gatekeeper Function ---
+  // --- The Gatekeeper Function ---
   const handleExportRequest = () => {
     if (!geometry) return;
 
     if (hasAccess) {
-        // Already paid this session -> Immediate Download
         performDownload();
     } else {
-        // Not paid -> Open Payment Modal
         startCheckout();
     }
   };
 
-  // --- NEW: Success Handler ---
+  // --- Success Handler ---
   const handlePaymentSuccess = () => {
     setHasAccess(true); // Unlock session
     performDownload();  // Download the file
@@ -94,13 +112,13 @@ export default function IntersectionModule() {
       <ModuleLayout
         title="Shadow Sculptor"
         subtitle={hasAccess ? "UNLOCKED // SESSION ACTIVE" : "Intersection Engine v1.0"}
-        color={hasAccess ? "emerald" : "cyan"} // Green if unlocked
+        color={hasAccess ? "emerald" : "cyan"} 
         canExport={!!geometry}
-        onExport={handleExportRequest} // Use gatekeeper instead of direct checkout
+        onExport={handleExportRequest} 
         sidebar={
           <div className="space-y-6">
             
-            {/* --- NEW: Session Status Indicator --- */}
+            {/* --- Session Status Indicator --- */}
             {hasAccess && (
                 <div className="bg-emerald-500/10 border border-emerald-500/50 p-3 rounded flex items-center gap-3 animate-in fade-in">
                     <CheckCircle2 size={16} className="text-emerald-500" />
@@ -123,7 +141,7 @@ export default function IntersectionModule() {
                </label>
             </div>
 
-            {/* --- SLIDERS WITH TOOLTIPS --- */}
+            {/* --- SLIDERS --- */}
             
             <CyberSlider 
                 label="Light Distance" icon={Zap} value={lightDistance} onChange={setLightDistance} min={30} max={160} step={5} unit="cm" 
@@ -170,12 +188,11 @@ export default function IntersectionModule() {
         <PaymentModal 
           clientSecret={clientSecret} 
           onClose={closeModal} 
-          onSuccess={handlePaymentSuccess} // Point to the new success handler
+          onSuccess={handlePaymentSuccess} 
           color="cyan"
           price="$0.99"
         />
       )}
-    {/* TAILWIND SAFELIST: Forces cyan loader classes to exist */}
       <div className="hidden border-cyan-500/20 border-t-cyan-500 bg-cyan-500/20 text-cyan-500/60"></div>
     </>
   );

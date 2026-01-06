@@ -15,6 +15,7 @@ import GeoSculptorModule from './modules/GeoSculptor';
 import WallArtModule from './modules/WallArt';
 import IntersectionModule from './modules/Intersection';
 import ResonanceModule from './modules/Resonance';
+import TypographyModule from './modules/Typography';
 
 // --- NEW REPLICATOR MODULE ---
 import Replicator from './modules/Replicator/ReplicatorSystem';
@@ -64,6 +65,8 @@ function App() {
           <Route path="/app/intersection" element={<IntersectionModule />} />
           <Route path="/hub" element={<Hub />} />
           <Route path="/resonance" element={<ResonanceModule />} />
+          <Route path="/typography" element={<TypographyModule />} />
+          
 
           {/* REPLICATOR ENGINE (New) */}
           <Route path="/replicator" element={<Replicator />} />

@@ -59,7 +59,7 @@ export const ModuleLayout = ({ title, subtitle, color, onExport, canExport, side
              disabled={!canExport}
              className={`px-6 py-2 bg-white text-black text-xs font-bold uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed transition-all rounded-sm ${buttonHover}`}
            >
-             Export .STL
+             Export
          </button>
        </header>
 

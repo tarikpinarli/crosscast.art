@@ -10,10 +10,10 @@ import {
     ScanLine, 
     Waypoints, 
     Square,
-    CheckCircle2 // Added for unlocked status
+    CheckCircle2 
 } from 'lucide-react';
 import * as THREE from 'three';
-import { STLExporter } from 'three-stdlib';
+import { GLTFExporter } from 'three-stdlib'; // <--- CHANGED FROM STLExporter
 
 import { ModuleLayout } from '../../components/layout/ModuleLayout';
 import { PaymentModal } from '../../components/PaymentModal';
@@ -132,7 +132,7 @@ export default function GeoSculptorModule() {
   // --- STATE ---
   const [mode, setMode] = useState<'SELECT' | 'VIEW'>('SELECT');
   
-  // NEW: Session Access State
+  // Session Access State
   const [hasAccess, setHasAccess] = useState(false);
 
   // Model Data
@@ -245,27 +245,43 @@ export default function GeoSculptorModule() {
      }
   }, [isCityMode, isRoadsEnabled]); 
 
-  // --- 2. EXPORT LOGIC ---
+  // --- 2. EXPORT LOGIC (UPDATED to GLB) ---
   const performDownload = () => {
     if (!modelData) return;
     
     const group = new THREE.Group();
     
-    if (isBaseEnabled && modelData.base) group.add(new THREE.Mesh(modelData.base));
-    if (modelData.buildings) group.add(new THREE.Mesh(modelData.buildings));
-    if (modelData.roads) group.add(new THREE.Mesh(modelData.roads));
+    // Create materials to differentiate parts in the exported GLB
+    const buildingMat = new THREE.MeshStandardMaterial({ color: 0xe4e4e7, roughness: 0.5 });
+    const baseMat = new THREE.MeshStandardMaterial({ color: 0x52525b, roughness: 0.8 });
+    const roadMat = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.9 });
 
-    const exporter = new STLExporter();
-    const result = exporter.parse(group);
-    
-    const blob = new Blob([result], { type: 'application/octet-stream' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `geo_sculptor_${Date.now()}.stl`; 
-    link.click();
-    
-    URL.revokeObjectURL(url);
+    if (isBaseEnabled && modelData.base) {
+        group.add(new THREE.Mesh(modelData.base, baseMat));
+    }
+    if (modelData.buildings) {
+        group.add(new THREE.Mesh(modelData.buildings, buildingMat));
+    }
+    if (modelData.roads) {
+        group.add(new THREE.Mesh(modelData.roads, roadMat));
+    }
+
+    // Use GLTFExporter for proper modern export
+    const exporter = new GLTFExporter();
+    exporter.parse(
+        group,
+        (gltf) => {
+            const blob = new Blob([gltf as ArrayBuffer], { type: 'model/gltf-binary' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `geo_sculptor_${Date.now()}.glb`; 
+            link.click();
+            URL.revokeObjectURL(url);
+        },
+        (err) => console.error("Export Failed:", err),
+        { binary: true }
+    );
   };
 
   // The Gatekeeper
@@ -299,7 +315,7 @@ export default function GeoSculptorModule() {
         sidebar={
           <div className="space-y-6">
             
-            {/* NEW: Session Status */}
+            {/* Session Status */}
             {hasAccess && (
                 <div className="bg-emerald-500/10 border border-emerald-500/50 p-3 rounded-sm flex items-center gap-3 animate-in fade-in">
                     <CheckCircle2 size={16} className="text-emerald-500" />
@@ -420,12 +436,12 @@ export default function GeoSculptorModule() {
         <PaymentModal 
             clientSecret={clientSecret} 
             onClose={closeModal} 
-            onSuccess={handlePaymentSuccess} // New success handler
+            onSuccess={handlePaymentSuccess} 
             color="cyan" 
             price="$1.99" 
         />
       )}
-      {/* TAILWIND SAFELIST: Forces cyan loader classes to exist */}
+      {/* TAILWIND SAFELIST */}
       <div className="hidden border-cyan-500/20 border-t-cyan-500 bg-cyan-500/20 text-cyan-500/60"></div>
     </>
   );

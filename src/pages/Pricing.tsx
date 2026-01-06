@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Header } from '../components/layout/Header';
-import { Check, Cpu, Globe, Layers, ArrowRight, Camera, Scissors, ShieldCheck, Box, AudioLines } from 'lucide-react';
+import { Check, Cpu, Globe, Layers, ArrowRight, Camera, Scissors, ShieldCheck, Box, AudioLines, Type } from 'lucide-react'; // Added Type
 import { Footer } from '../components/layout/Footer';
 
 const MODULE_DATA = [
@@ -60,6 +60,21 @@ const MODULE_DATA = [
       'Variable Resolution',
       'Manifold Base Generation'
     ]
+  },
+  // NEW
+  {
+    id: 'typography',
+    name: 'Glyph Engine',
+    price: '0.99',
+    icon: Type,
+    color: 'indigo',
+    desc: 'TrueType parametric extrusion. Generate 3D text with custom chamfers, kerning, and materials.',
+    specs: [
+      'Font-to-Mesh Parsing',
+      'Non-Destructive Bevels',
+      'Multi-Line Support',
+      'Character Kerning Logic'
+    ]
   }
 ];
 
@@ -81,7 +96,7 @@ export default function Pricing() {
         </div>
 
         {/* Pricing Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 items-stretch"> {/* Changed to grid-cols-5 */}
           {MODULE_DATA.map((mod) => (
             <div 
               key={mod.id}

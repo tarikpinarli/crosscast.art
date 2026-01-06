@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Copy, Box, Mountain, ArrowRight, Zap, Shield, Cpu, Activity, AudioLines } from 'lucide-react';
+import { Copy, Box, Mountain, ArrowRight, Zap, Shield, Cpu, Activity, AudioLines, Type } from 'lucide-react'; // Added Type
 import { Header } from '../components/layout/Header';
 import { Footer } from '../components/layout/Footer';
 
@@ -47,7 +47,19 @@ const PROTOCOLS = [
     icon: AudioLines,
     path: '/resonance',
     color: 'purple',
-    video: '/module_videos/resonance_preview.mov' // Placeholder video path
+    video: '/module_videos/resonance_preview.mov'
+  },
+  // NEW PROTOCOL
+  {
+    id: 'typography',
+    name: 'Glyph Engine',
+    version: 'v0.9-BETA',
+    desc: 'Parametric text extruder. Creates manifold 3D typography with custom bevels, fonts, and kerning logic.',
+    specs: ['TrueType Parsing', 'Auto-Kerning', 'Chamfer Control'],
+    icon: Type,
+    path: '/typography',
+    color: 'indigo',
+    video: '/module_videos/typography_preview.mov'
   }
 ];
 

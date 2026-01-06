@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Header } from '../components/layout/Header';
-import { Zap, ShoppingBag, Palette, Gift, ArrowRight, Layers, Map, Camera, AudioLines } from 'lucide-react';
+import { Zap, ShoppingBag, Palette, Gift, ArrowRight, Layers, Map, Camera, AudioLines, Type } from 'lucide-react'; // Added Type
 import { Footer } from '../components/layout/Footer';
 
 const SOLUTION_CARDS = [
@@ -32,6 +32,14 @@ const SOLUTION_CARDS = [
     icon: AudioLines,
     tag: "RESONANCE",
     path: "/resonance" 
+  },
+  // NEW
+  { 
+    title: "Parametric Typography", 
+    desc: "Generate manufacturing-ready 3D signage. Customize fonts, spacing, and bevels for laser cutting or 3D printing.", 
+    icon: Type,
+    tag: "GLYPH ENGINE",
+    path: "/typography" 
   }
 ];
 
@@ -58,7 +66,7 @@ export default function Solutions() {
         </div>
 
         {/* Solutions Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 gap-4 md:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6"> {/* Expanded to 3 cols */}
           {SOLUTION_CARDS.map((item, i) => (
             <Link 
               key={i} 

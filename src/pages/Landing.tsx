@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Copy, Box, Mountain, ArrowRight, ShieldCheck, Cpu, Activity, Zap, Layers, AudioLines } from 'lucide-react';
+import { Copy, Box, Mountain, ArrowRight, ShieldCheck, Cpu, Activity, Zap, Layers, AudioLines, Type } from 'lucide-react'; // Added Type
 import { Header } from '../components/layout/Header';
 import { Footer } from '../components/layout/Footer';
 
@@ -44,6 +44,17 @@ const MODULES = [
     status: 'NEW', 
     color: 'purple', 
     videoOverlay: '/module_videos/resonance_preview.mov' 
+  },
+  // NEW MODULE
+  { 
+    id: 'typography', 
+    name: 'Glyph Engine', 
+    desc: 'Parametric text extrusion. Convert TrueType fonts into watertight, manufacturing-ready meshes.', 
+    icon: Type, 
+    path: '/typography', 
+    status: 'BETA', 
+    color: 'indigo', 
+    videoOverlay: '/module_videos/typography_preview.mov' 
   }
 ];
 
@@ -174,7 +185,7 @@ export default function Landing() {
                     </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"> {/* Adjusted Grid Cols */}
                     {MODULES.map((mod) => (
                         <Link 
                           key={mod.id} 

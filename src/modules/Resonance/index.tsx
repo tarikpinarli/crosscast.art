@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, Square, CheckCircle2, Sliders, Maximize, Activity, Layers, Component, Split, UploadCloud, Loader2 } from 'lucide-react'; 
+import * as THREE from 'three';
+import { GLTFExporter } from 'three-stdlib'; 
 
 import { ModuleLayout } from '../../components/layout/ModuleLayout';
 import { CyberSlider } from '../../components/ui/CyberSlider';
@@ -9,7 +11,6 @@ import { usePayment } from '../../hooks/usePayment';
 import { useAudioLogic } from './hooks/useAudioLogic';
 import { FrequencyView } from './components/FrequencyView';
 import { WaveformTrimmer } from './components/WaveformTrimmer';
-import { exportSTL } from './utils/audioToGeo';
 
 export default function ResonanceModule() {
     const { showModal, clientSecret, startCheckout, closeModal } = usePayment('resonance-basic');
@@ -55,7 +56,38 @@ export default function ResonanceModule() {
         }
     }, [width, length, baseThickness, gain, trimStart, trimEnd, resolution, isMirrored, hasRecording]);
 
-    const handleDownload = () => { if (!geometry) return; const blob = exportSTL(geometry); const url = URL.createObjectURL(new Blob([blob], { type: 'application/octet-stream' })); const link = document.createElement('a'); link.href = url; link.download = `frequency_landscape_${Date.now()}.stl`; link.click(); URL.revokeObjectURL(url); };
+    // --- UPDATED: GLB Export Logic ---
+    const handleDownload = () => { 
+        if (!geometry) return; 
+
+        // 1. Create Mesh with FLAT SHADING (The Fix)
+        const material = new THREE.MeshStandardMaterial({
+            color: 0xa855f7, // Purple
+            roughness: 0.4,
+            metalness: 0.3,
+            flatShading: true, // <--- PRESERVES "LOW POLY" DETAIL
+            side: THREE.DoubleSide
+        });
+        const mesh = new THREE.Mesh(geometry, material);
+
+        // 2. Export to GLB
+        const exporter = new GLTFExporter();
+        exporter.parse(
+            mesh,
+            (gltf) => {
+                const blob = new Blob([gltf as ArrayBuffer], { type: 'model/gltf-binary' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `frequency_landscape_${Date.now()}.glb`; 
+                link.click();
+                URL.revokeObjectURL(url);
+            },
+            (err) => console.error("Export Failed:", err),
+            { binary: true }
+        );
+    };
+
     const handleExportRequest = () => { if (!geometry) return; if (hasAccess) handleDownload(); else startCheckout(); };
     const handlePaymentSuccess = () => { setHasAccess(true); handleDownload(); closeModal(); };
 
@@ -83,7 +115,7 @@ export default function ResonanceModule() {
                                 className="hidden" 
                             />
 
-                            {/* MAIN DISPLAY: Time or Loading */}
+                            {/* MAIN DISPLAY */}
                             {isProcessing ? (
                                 <div className="flex flex-col items-center justify-center h-16 animate-pulse text-purple-400 gap-2">
                                     <Loader2 size={32} className="animate-spin" />
