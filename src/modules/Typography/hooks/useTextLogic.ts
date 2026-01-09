@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { FONT_LIBRARY } from '../data/fontLibrary';
 import { generateTextMesh } from '../utils/meshGenerator';
-import { useModelExporter } from './useModelExporter'; // <--- UPDATED IMPORT
+import { useModelExporter } from './useModelExporter';
 
 export { FONT_LIBRARY };
 
@@ -28,7 +28,7 @@ export const useTextLogic = () => {
 
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
     
-    // <--- USE NEW EXPORTER
+    // Use the GLTF/GLB Exporter
     const { exportModel } = useModelExporter(); 
 
     useEffect(() => {
@@ -73,9 +73,8 @@ export const useTextLogic = () => {
         return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); };
     }, [text, selectedFont, depth, bevelThickness, bevelSize, letterSpacing]);
 
-    // <--- UPDATED EXPORT FUNCTION
-    // We now pass the materialParams to the exporter
-    const exportSTL = () => exportModel(geometry, materialParams);
+    // --- FIX: RENAME TO exportGLB ---
+    const exportGLB = () => exportModel(geometry, materialParams);
 
     return {
         text, setText,
@@ -89,6 +88,6 @@ export const useTextLogic = () => {
             letterSpacing, setLetterSpacing 
         },
         materialParams, setMaterialParams,
-        exportSTL // This function name stays the same for compatibility with index.tsx
+        exportGLB // <--- Function name updated to match the file type
     };
 };

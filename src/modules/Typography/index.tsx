@@ -9,7 +9,7 @@ import { usePayment } from '../../hooks/usePayment';
 import { useTextLogic } from './hooks/useTextLogic';
 import { TypographyView } from './components/TypographyView';
 import { FontSelector } from './components/FontSelector';
-import { MaterialLab } from './components/MaterialLab'; // <--- NEW IMPORT
+import { MaterialLab } from './components/MaterialLab';
 
 export default function TypographyModule() {
     const { showModal, clientSecret, startCheckout, closeModal } = usePayment('typography-basic');
@@ -22,18 +22,18 @@ export default function TypographyModule() {
         status, 
         params, 
         materialParams, setMaterialParams, 
-        exportSTL 
+        exportGLB // <--- UPDATED IMPORT
     } = useTextLogic();
 
     const handleExportRequest = () => {
         if (!geometry) return;
-        if (hasAccess) exportSTL();
+        if (hasAccess) exportGLB();
         else startCheckout();
     };
 
     const handlePaymentSuccess = () => {
         setHasAccess(true);
-        exportSTL();
+        exportGLB();
         closeModal();
     };
 
@@ -63,7 +63,7 @@ export default function TypographyModule() {
 
                         <div className="h-px bg-zinc-800"></div>
 
-                        {/* NEW: COLLAPSIBLE MATERIAL LAB */}
+                        {/* MATERIAL LAB */}
                         <MaterialLab 
                             materialParams={materialParams} 
                             setMaterialParams={setMaterialParams} 

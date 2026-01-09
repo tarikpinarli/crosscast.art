@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Upload, Box, Activity, Scaling, Layers, Maximize2, Grid as GridIcon, CheckCircle2 } from 'lucide-react';
 import { WallArtView } from './WallArtView'; 
-import { generateReliefGeometry, ReliefConfig, exportToSTL } from '../../utils/WallArt/reliefEngine';
+import { generateReliefGeometry, ReliefConfig } from '../../utils/WallArt/reliefEngine'; // Removed exportToSTL
 import * as THREE from 'three';
+import { GLTFExporter } from 'three-stdlib'; // <--- NEW IMPORT
 
 // --- SYSTEM IMPORTS ---
 import { ModuleLayout } from '../../components/layout/ModuleLayout';
@@ -29,7 +30,7 @@ export default function WallArtModule() {
   const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   
-  // --- NEW: Session Access State ---
+  // --- Session Access State ---
   const [hasAccess, setHasAccess] = useState(false);
 
   // 3. Parameters
@@ -75,14 +76,34 @@ export default function WallArtModule() {
     return () => clearTimeout(timer);
   }, [processGeometry, image]);
 
-  // --- EXPORT LOGIC ---
+  // --- UPDATED: GLB Export Logic ---
   const performDownload = () => {
     if (!geometry) return;
-    const blob = exportToSTL(geometry);
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url; link.download = `pixel-relief.stl`; link.click();
-    URL.revokeObjectURL(url);
+    
+    // 1. Create Mesh with selected color
+    const material = new THREE.MeshStandardMaterial({
+        color: objectColor, // Use the user's selected material color
+        roughness: 0.5,
+        metalness: 0.1
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+
+    // 2. Export to GLB
+    const exporter = new GLTFExporter();
+    exporter.parse(
+        mesh,
+        (gltf) => {
+            const blob = new Blob([gltf as ArrayBuffer], { type: 'model/gltf-binary' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `pixel-relief-${Date.now()}.glb`; 
+            link.click();
+            URL.revokeObjectURL(url);
+        },
+        (err) => console.error("Export Failed:", err),
+        { binary: true }
+    );
   };
 
   // 1. Gatekeeper Function
@@ -115,7 +136,7 @@ export default function WallArtModule() {
         sidebar={
           <div className="space-y-6">
             
-            {/* NEW: Session Status */}
+            {/* Session Status */}
             {hasAccess && (
                 <div className="bg-emerald-500/10 border border-emerald-500/50 p-3 rounded-sm flex items-center gap-3 animate-in fade-in">
                     <CheckCircle2 size={16} className="text-emerald-500" />

@@ -150,7 +150,7 @@ export default function IntersectionModule() {
             />
 
             <CyberSlider 
-                label="Resolution" icon={GridIcon} value={gridSize} onChange={setGridSize} min={50} max={250} step={10} unit="px" 
+                label="Resolution" icon={GridIcon} value={gridSize} onChange={setGridSize} min={50} max={400} step={10} unit="px" 
                 color="cyan"
                 tooltip="Voxel grid density. Higher values (150+) are smoother but require more processing power." 
             />
