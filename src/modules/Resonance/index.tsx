@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-// Added 'Wind' icon for the smoothing slider
 import { Mic, Square, CheckCircle2, Sliders, Maximize, Activity, Layers, Component, Split, UploadCloud, Loader2, Wind } from 'lucide-react'; 
 import * as THREE from 'three';
 import { GLTFExporter } from 'three-stdlib'; 
@@ -13,10 +12,15 @@ import { useAudioLogic } from './hooks/useAudioLogic';
 import { FrequencyView } from './components/FrequencyView';
 import { WaveformTrimmer } from './components/WaveformTrimmer';
 
+// --- SEO IMPORTS ---
+import { SeoHead } from '../../components/seo/SeoHead';
+import { SEO_CONFIG } from '../../config/seoConfig';
+
 export default function ResonanceModule() {
     const { showModal, clientSecret, startCheckout, closeModal } = usePayment('resonance-basic');
     const [hasAccess, setHasAccess] = useState(false);
 
+    // Audio Logic
     const { isRecording, isProcessing, isPlaying, progress, duration, hasRecording, geometry, dataRef, actions, audioBlob, debugMsg } = useAudioLogic();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -27,7 +31,7 @@ export default function ResonanceModule() {
     const [baseThickness, setBaseThickness] = useState(1.0);
     const [gain, setGain] = useState(3.0);
     const [resolution, setResolution] = useState(0.5); 
-    const [smoothing, setSmoothing] = useState(0.5); // <--- NEW STATE
+    const [smoothing, setSmoothing] = useState(0.5); 
     const [isMirrored, setIsMirrored] = useState(true);
 
     const [trimStart, setTrimStart] = useState(0);
@@ -41,13 +45,13 @@ export default function ResonanceModule() {
         }
     };
 
+    // Auto-Update Geometry
     useEffect(() => {
         if (hasRecording && dataRef.buffer) {
             const timer = setTimeout(() => {
                 const recordedLen = dataRef.rows * 64; 
                 const safeBuffer = dataRef.buffer!.slice(0, recordedLen);
-                // PASSING SMOOTHING HERE:
-                // Ensure actions.updateGeometry in your hook accepts this new argument!
+                
                 actions.updateGeometry(
                     safeBuffer, 
                     dataRef.rows, 
@@ -59,27 +63,21 @@ export default function ResonanceModule() {
                     trimEnd/100, 
                     resolution, 
                     isMirrored,
-                    smoothing // <--- Passed to logic
+                    smoothing 
                 );
             }, 50);
             return () => clearTimeout(timer);
         }
-    }, [width, length, baseThickness, gain, trimStart, trimEnd, resolution, isMirrored, smoothing, hasRecording]); // Added smoothing dependency
+    }, [width, length, baseThickness, gain, trimStart, trimEnd, resolution, isMirrored, smoothing, hasRecording]);
 
+    // Download Logic
     const handleDownload = () => { 
         if (!geometry) return; 
 
-        // 1. CLONE & PREPARE GEOMETRY
-        // We clone it so we don't mess up the live view
         const exportGeo = geometry.clone();
-        
-        // This is the Magic Fix:
-        // It splits shared vertices, making every triangle independent.
-        // This forces the "Flat Shaded" / "Low Poly" look to be permanent in the file.
         const nonIndexedGeo = exportGeo.toNonIndexed();
         nonIndexedGeo.computeVertexNormals();
 
-        // 2. CREATE EXPORT MESH
         const material = new THREE.MeshStandardMaterial({
             color: 0xa855f7,
             roughness: 0.4,
@@ -89,8 +87,6 @@ export default function ResonanceModule() {
         });
         
         const mesh = new THREE.Mesh(nonIndexedGeo, material);
-        
-        // 3. EXPORT
         const exporter = new GLTFExporter();
         exporter.parse(
             mesh,
@@ -102,8 +98,6 @@ export default function ResonanceModule() {
                 link.download = `frequency_landscape_${Date.now()}.glb`; 
                 link.click();
                 URL.revokeObjectURL(url);
-                
-                // Cleanup memory
                 nonIndexedGeo.dispose();
                 exportGeo.dispose();
             },
@@ -117,6 +111,9 @@ export default function ResonanceModule() {
 
     return (
         <>
+            {/* --- INJECT SEO TAGS HERE --- */}
+            <SeoHead {...SEO_CONFIG.resonance} />
+
             <ModuleLayout
                 title="Resonance Engine"
                 subtitle={hasAccess ? "UNLOCKED // SESSION ACTIVE" : "Frequency Landscape Generator"}
@@ -169,17 +166,14 @@ export default function ResonanceModule() {
                                 {isRecording ? "Listening..." : isProcessing ? "Please Wait" : "Record or Upload"}
                             </p>
 
-                            {/* DEBUG / WARNING MESSAGE UI */}
+                            {/* Debug UI */}
                             {debugMsg && (
                                 <div className={`p-2 border text-xs font-mono rounded mt-2 flex justify-between items-center ${
                                     debugMsg.includes("Mesh generated") 
-                                    ? "bg-yellow-900/20 border-yellow-500/50 text-yellow-200" // Yellow for Warnings
-                                    : "bg-red-900/50 border-red-500 text-red-200"             // Red for Errors
+                                    ? "bg-yellow-900/20 border-yellow-500/50 text-yellow-200" 
+                                    : "bg-red-900/50 border-red-500 text-red-200"
                                 }`}>
-                                    <span>
-                                        {debugMsg.includes("Mesh generated") ? "⚠ INFO: " : "ERR: "} 
-                                        {debugMsg}
-                                    </span>
+                                    <span>{debugMsg}</span>
                                 </div>
                             )}
                         </div>
@@ -212,10 +206,7 @@ export default function ResonanceModule() {
                              </div>
                              
                              <CyberSlider label="Mesh Detail" icon={Component} value={resolution} onChange={setResolution} min={0.1} max={1.0} step={0.1} color="purple" />
-                             
-                             {/* NEW SMOOTHING SLIDER */}
                              <CyberSlider label="Fluid Smoothing" icon={Wind} value={smoothing} onChange={setSmoothing} min={0} max={1.0} step={0.1} color="purple" />
-
                              <CyberSlider label="Peak Height" icon={Activity} value={gain} onChange={setGain} min={1} max={8.0} step={0.2} color="purple" />
                              <CyberSlider label="Base Thickness" icon={Layers} value={baseThickness} onChange={setBaseThickness} min={0.2} max={4.0} step={0.1} unit="cm" color="purple" />
                              <CyberSlider label="Width" icon={Maximize} value={width} onChange={setWidth} min={5} max={20} step={1} unit="cm" color="purple" />
