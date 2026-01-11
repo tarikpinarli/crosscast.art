@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import * as THREE from 'three';
-import { generateLandscapeGeometry } from '../utils/audioToGeo';
+import { generateLandscapeGeometry } from '../utils/audioToGeo'; 
 
 export const useAudioLogic = () => {
     // --- STATE ---
@@ -11,7 +11,7 @@ export const useAudioLogic = () => {
     const [duration, setDuration] = useState(0); 
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
     const [progress, setProgress] = useState(0); 
-    const [debugMsg, setDebugMsg] = useState(""); // New Debug State
+    const [debugMsg, setDebugMsg] = useState(""); 
 
     // --- REFS ---
     const audioContextRef = useRef<AudioContext | null>(null);
@@ -26,25 +26,24 @@ export const useAudioLogic = () => {
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
     const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
-    const mimeTypeRef = useRef<string>(""); // Store the correct format
+    const mimeTypeRef = useRef<string>(""); 
 
     const FREQ_BINS = 64; 
 
     // --- HELPER: Setup Player ---
-    const setupAudioPlayer = (blob: Blob) => {
-        setAudioBlob(blob);
+    const setupAudioPlayer = (blobOrFile: Blob | File) => {
+        setAudioBlob(blobOrFile);
         
         if (audioPlayerRef.current) {
             audioPlayerRef.current.pause();
             audioPlayerRef.current.src = "";
-            audioPlayerRef.current.load(); // Force unload
+            audioPlayerRef.current.load(); 
         }
         
-        const url = URL.createObjectURL(blob);
+        // OPTIMIZATION: Stream directly from file to save memory
+        const url = URL.createObjectURL(blobOrFile);
         const audio = new Audio(url);
-        
-        // Mobile Safari needs explicit loading sometimes
-        audio.load();
+        audio.preload = 'metadata'; 
 
         audio.onended = () => {
             setIsPlaying(false);
@@ -52,17 +51,84 @@ export const useAudioLogic = () => {
             if (playbackRafRef.current) cancelAnimationFrame(playbackRafRef.current);
         };
         
-        // Error Listener
         audio.onerror = (e) => {
-            const err = "Audio Error: " + (audio.error ? audio.error.code : "Unknown");
-            console.error(err);
-            setDebugMsg(err);
+            const code = audio.error ? audio.error.code : 0;
+            let msg = "Unknown Audio Error";
+            if (code === 4) msg = "Format not supported by browser, but Mesh generated.";
+            if (code === 3) msg = "Decoding error.";
+            console.warn("Audio Playback Error:", msg);
+            setDebugMsg(msg);
         };
 
         audioPlayerRef.current = audio;
     };
 
-    // --- 1. START RECORDING (Mobile Safe) ---
+    // --- 6. GEOMETRY GENERATION ---
+    const updateGeometry = useCallback((
+        data: Uint8Array, 
+        totalRows: number, 
+        width: number, 
+        length: number, 
+        baseHeight: number, 
+        gain: number, 
+        trimStart: number, 
+        trimEnd: number, 
+        resolution: number, 
+        mirrored: boolean,
+        smoothing: number
+    ) => {
+        if (!data || totalRows < 2) return;
+        
+        // Clamp indices
+        const startRow = Math.floor(totalRows * trimStart);
+        const endRow = Math.floor(totalRows * trimEnd);
+        let rowCount = endRow - startRow;
+        
+        if (rowCount < 2) return;
+
+        const startIdx = startRow * FREQ_BINS;
+        const endIdx = endRow * FREQ_BINS;
+        
+        // Safety check
+        if (endIdx > data.length) return; 
+        const rawSlice = data.slice(startIdx, endIdx);
+
+        // Resolution Stride Logic
+        const stride = Math.max(1, Math.floor(1 / resolution));
+        let finalData = rawSlice;
+        let finalRows = rowCount;
+
+        if (stride > 1) {
+            finalRows = Math.floor(rowCount / stride);
+            finalData = new Uint8Array(finalRows * FREQ_BINS);
+            for (let i = 0; i < finalRows; i++) {
+                const sourceRowIndex = i * stride;
+                const targetIdx = i * FREQ_BINS;
+                const sourceIdx = sourceRowIndex * FREQ_BINS;
+                
+                if (sourceIdx + FREQ_BINS <= rawSlice.length) {
+                    for (let b = 0; b < FREQ_BINS; b++) {
+                        finalData[targetIdx + b] = rawSlice[sourceIdx + b];
+                    }
+                }
+            }
+        }
+
+        const geom = generateLandscapeGeometry(
+            finalData, 
+            finalRows, 
+            FREQ_BINS, 
+            width, 
+            length, 
+            baseHeight, 
+            gain, 
+            mirrored,
+            smoothing
+        );
+        setGeometry(geom);
+    }, []);
+
+    // --- 1. START RECORDING ---
     const startRecording = async () => {
         setDebugMsg("");
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -71,7 +137,6 @@ export const useAudioLogic = () => {
         }
 
         try {
-            // Initialize Audio Context
             if (!audioContextRef.current) {
                 const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
                 audioContextRef.current = new AudioContextClass();
@@ -82,25 +147,17 @@ export const useAudioLogic = () => {
             
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             
-            // --- DETECT SUPPORTED FORMAT ---
-            // iPhones prefer mp4/aac. Computers prefer webm.
             let mimeType = 'audio/webm';
-            if (MediaRecorder.isTypeSupported('audio/mp4')) {
-                mimeType = 'audio/mp4';
-            } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
-                mimeType = 'audio/ogg';
-            }
+            if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+            else if (MediaRecorder.isTypeSupported('audio/ogg')) mimeType = 'audio/ogg';
             mimeTypeRef.current = mimeType;
-            console.log("Using MIME:", mimeType);
 
-            // Connect Visualizer
             const source = audioContextRef.current!.createMediaStreamSource(stream);
             const analyser = audioContextRef.current!.createAnalyser();
             analyser.fftSize = FREQ_BINS * 2; 
             source.connect(analyser);
             analyserRef.current = analyser;
 
-            // Start Recorder with specific MIME type
             const mediaRecorder = new MediaRecorder(stream, { mimeType });
             audioChunksRef.current = [];
             
@@ -109,7 +166,6 @@ export const useAudioLogic = () => {
             };
             
             mediaRecorder.onstop = () => {
-                // Create Blob with the SAME MIME type used to record
                 const blob = new Blob(audioChunksRef.current, { type: mimeTypeRef.current });
                 setupAudioPlayer(blob);
             };
@@ -117,8 +173,7 @@ export const useAudioLogic = () => {
             mediaRecorder.start();
             mediaRecorderRef.current = mediaRecorder;
 
-            // Setup Buffers
-            const MAX_FRAMES = 1800; 
+            const MAX_FRAMES = 3600; 
             historyRef.current = new Uint8Array(MAX_FRAMES * FREQ_BINS);
             frameCountRef.current = 0;
             startTimeRef.current = Date.now();
@@ -136,7 +191,7 @@ export const useAudioLogic = () => {
         }
     };
 
-    // --- 2. LOOP (Unchanged) ---
+    // --- 2. LOOP ---
     const analyzeLoop = () => {
         if (!analyserRef.current || !historyRef.current) return;
         const buffer = new Uint8Array(FREQ_BINS);
@@ -152,7 +207,7 @@ export const useAudioLogic = () => {
         rafRef.current = requestAnimationFrame(analyzeLoop);
     };
 
-    // --- 3. STOP (Unchanged) ---
+    // --- 3. STOP ---
     const stopRecording = () => {
         if (audioContextRef.current) {
             audioContextRef.current.suspend(); 
@@ -165,12 +220,12 @@ export const useAudioLogic = () => {
             if (frameCountRef.current > 2 && historyRef.current) {
                 const recordedLength = frameCountRef.current * FREQ_BINS;
                 const finalData = historyRef.current.slice(0, recordedLength);
-                updateGeometry(finalData, frameCountRef.current, 10, 15, 1.0, 3.0, 0, 1, 0.5, true);
+                updateGeometry(finalData, frameCountRef.current, 10, 15, 1.0, 3.0, 0, 1, 0.5, true, 0.5);
             }
         }
     };
 
-    // --- 4. IMPORT (Unchanged) ---
+    // --- 4. IMPORT (OPTIMIZED FOR LARGE FILES) ---
     const importAudioFile = async (file: File) => {
         setIsProcessing(true);
         setGeometry(null);
@@ -187,38 +242,66 @@ export const useAudioLogic = () => {
             const arrayBuffer = await file.arrayBuffer();
             const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
             
+            // --- AUTO SCALING LOGIC ---
+            // 2048 samples = ~21fps
+            // 4096 samples = ~10fps
+            // 16384 samples = ~2.6fps (for massive files)
+            let bufferSize = 2048;
+            if (audioBuffer.duration > 60) bufferSize = 4096;
+            if (audioBuffer.duration > 300) bufferSize = 16384; 
+
+            // Create Offline Context
             const offlineCtx = new OfflineAudioContext(1, audioBuffer.length, audioBuffer.sampleRate);
+            
+            // Source
             const source = offlineCtx.createBufferSource();
             source.buffer = audioBuffer;
+
+            // Analyser
             const analyser = offlineCtx.createAnalyser();
             analyser.fftSize = FREQ_BINS * 2;
-            source.connect(analyser);
-            analyser.connect(offlineCtx.destination);
-            source.start(0);
+            analyser.smoothingTimeConstant = 0.2;
 
-            const fps = 30;
-            const totalFrames = Math.floor(audioBuffer.duration * fps);
-            const interval = 1 / fps;
-            const capturedData = new Uint8Array(totalFrames * FREQ_BINS);
+            // Script Processor (The Fast-Forward Mechanism)
+            const processor = offlineCtx.createScriptProcessor(bufferSize, 1, 1);
+            
+            // Connect Graph
+            source.connect(analyser);
+            analyser.connect(processor);
+            processor.connect(offlineCtx.destination);
+
+            // Container for data
+            const capturedBuffers: Uint8Array[] = [];
             const tempArray = new Uint8Array(FREQ_BINS);
 
-            for (let i = 0; i < totalFrames; i++) {
-                offlineCtx.suspend(i * interval).then(() => {
-                    analyser.getByteFrequencyData(tempArray);
-                    capturedData.set(tempArray, i * FREQ_BINS);
-                }).then(() => offlineCtx.resume());
-            }
+            // Capture logic
+            processor.onaudioprocess = () => {
+                analyser.getByteFrequencyData(tempArray);
+                // We must copy the array, otherwise it gets overwritten
+                capturedBuffers.push(new Uint8Array(tempArray));
+            };
 
+            // Start Rendering
+            source.start(0);
             await offlineCtx.startRendering();
 
-            historyRef.current = capturedData;
+            // Processing Finished: Flatten the data
+            const totalFrames = capturedBuffers.length;
+            const fullData = new Uint8Array(totalFrames * FREQ_BINS);
+            
+            for(let i=0; i < totalFrames; i++) {
+                fullData.set(capturedBuffers[i], i * FREQ_BINS);
+            }
+
+            historyRef.current = fullData;
             frameCountRef.current = totalFrames;
             setDuration(audioBuffer.duration);
             
-            const blob = new Blob([await file.arrayBuffer()], { type: file.type });
-            setupAudioPlayer(blob);
+            // Setup Player
+            setupAudioPlayer(file);
 
-            updateGeometry(capturedData, totalFrames, 10, 15, 1.0, 3.0, 0, 1, 0.5, true);
+            // Update Geometry
+            updateGeometry(fullData, totalFrames, 10, 15, 1.0, 3.0, 0, 1, 0.5, true, 0.5);
             
         } catch (err: any) {
             console.error("Import Failed", err);
@@ -228,13 +311,15 @@ export const useAudioLogic = () => {
         }
     };
 
-    // --- 5. PLAYBACK (DEBUG MODE) ---
+    // --- 5. PLAYBACK ---
     const togglePlayback = (startPct: number, endPct: number) => {
-        if (!audioPlayerRef.current) {
-            alert("No audio player found");
+        if (!audioPlayerRef.current) return;
+        const audio = audioPlayerRef.current;
+
+        if (audio.error) {
+            alert("This audio format is not supported for playback by your browser, but the 3D mesh was generated successfully.");
             return;
         }
-        const audio = audioPlayerRef.current;
 
         if (isPlaying) {
             audio.pause();
@@ -243,7 +328,6 @@ export const useAudioLogic = () => {
         } else {
             const totalDur = audio.duration;
             
-            // Handle NaN duration (common loading issue)
             if (!isFinite(totalDur)) {
                  audio.currentTime = 0;
             } else {
@@ -254,15 +338,13 @@ export const useAudioLogic = () => {
                  }
             }
 
-            // --- THE CRITICAL MOBILE FIX ---
-            // We use a simple promise chain with an ALERT on failure
             const playPromise = audio.play();
 
             if (playPromise !== undefined) {
                 playPromise
                     .then(() => {
                         setIsPlaying(true);
-                        setDebugMsg(""); // Clear errors on success
+                        setDebugMsg(""); 
 
                         const loop = () => {
                             if (!audio || audio.paused) return;
@@ -284,49 +366,12 @@ export const useAudioLogic = () => {
                     })
                     .catch(error => {
                         console.error("Playback prevented:", error);
-                        // ALERT THE USER SO WE KNOW WHY
-                        alert("Playback Failed: " + error.message); 
                         setDebugMsg("Play Fail: " + error.message);
                         setIsPlaying(false);
                     });
             }
         }
     };
-
-    // --- 6. GEOMETRY (Unchanged) ---
-    const updateGeometry = useCallback((
-        data: Uint8Array, totalRows: number, width: number, length: number, baseHeight: number, 
-        gain: number, trimStart: number, trimEnd: number, resolution: number, mirrored: boolean
-    ) => {
-        if (!data || totalRows < 2) return;
-        const startRow = Math.floor(totalRows * trimStart);
-        const endRow = Math.floor(totalRows * trimEnd);
-        let rowCount = endRow - startRow;
-        if (rowCount < 2) return;
-
-        const startIdx = startRow * FREQ_BINS;
-        const endIdx = endRow * FREQ_BINS;
-        const rawSlice = data.slice(startIdx, endIdx);
-
-        const stride = Math.max(1, Math.floor(1 / resolution));
-        let finalData = rawSlice;
-        let finalRows = rowCount;
-
-        if (stride > 1) {
-            finalRows = Math.floor(rowCount / stride);
-            finalData = new Uint8Array(finalRows * FREQ_BINS);
-            for (let i = 0; i < finalRows; i++) {
-                const sourceRowIndex = i * stride;
-                const targetIdx = i * FREQ_BINS;
-                const sourceIdx = sourceRowIndex * FREQ_BINS;
-                for (let b = 0; b < FREQ_BINS; b++) {
-                    finalData[targetIdx + b] = rawSlice[sourceIdx + b];
-                }
-            }
-        }
-        const geom = generateLandscapeGeometry(finalData, finalRows, FREQ_BINS, width, length, baseHeight, gain, mirrored);
-        setGeometry(geom);
-    }, []);
 
     useEffect(() => {
         return () => {
