@@ -15,9 +15,11 @@ export const useAudioLogic = () => {
     // --- REFS ---
     const audioContextRef = useRef<AudioContext | null>(null);
     const analyserRef = useRef<AnalyserNode | null>(null);
-    const rafRef = useRef<number | null>(null);
-    const startTimeRef = useRef<number>(0);
     
+    const rafRef = useRef<number | null>(null); // Recording Loop
+    const playbackRafRef = useRef<number | null>(null); // Playback Loop
+    
+    const startTimeRef = useRef<number>(0);
     const historyRef = useRef<Uint8Array | null>(null);
     const frameCountRef = useRef(0);
     
@@ -27,33 +29,55 @@ export const useAudioLogic = () => {
 
     const FREQ_BINS = 64; 
 
-    // Helper: Ensure Audio Context is active (Vital for Mobile)
-    const ensureAudioContext = async () => {
-        if (!audioContextRef.current) {
-            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-            audioContextRef.current = new AudioContextClass();
+    // --- HELPER: Setup Player ---
+    // We create the audio element once and keep it ready
+    const setupAudioPlayer = (blob: Blob) => {
+        setAudioBlob(blob);
+        
+        // Clean up old player
+        if (audioPlayerRef.current) {
+            audioPlayerRef.current.pause();
+            audioPlayerRef.current.src = "";
         }
-        if (audioContextRef.current.state === 'suspended') {
-            await audioContextRef.current.resume();
-        }
+        
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        
+        // IMPORTANT FOR MOBILE: 
+        // We do not call .load() here asynchronously. 
+        // We just prepare it.
+        
+        audio.onended = () => {
+            setIsPlaying(false);
+            setProgress(0); // Optional: Reset to start
+            if (playbackRafRef.current) cancelAnimationFrame(playbackRafRef.current);
+        };
+        
+        audioPlayerRef.current = audio;
     };
 
     // --- 1. START RECORDING ---
     const startRecording = async () => {
+        // ... (Same validation as before) ...
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             alert("Microphone not supported.");
             return;
         }
 
         try {
-            await ensureAudioContext(); // Wake up audio engine
+            // Initialize Audio Context (Standard pattern for Web Audio API)
+            if (!audioContextRef.current) {
+                const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+                audioContextRef.current = new AudioContextClass();
+            }
+            if (audioContextRef.current.state === 'suspended') {
+                await audioContextRef.current.resume();
+            }
             
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            
             const source = audioContextRef.current!.createMediaStreamSource(stream);
             const analyser = audioContextRef.current!.createAnalyser();
             analyser.fftSize = FREQ_BINS * 2; 
-            analyser.smoothingTimeConstant = 0.5; 
             source.connect(analyser);
             analyserRef.current = analyser;
 
@@ -66,29 +90,18 @@ export const useAudioLogic = () => {
             
             mediaRecorder.onstop = () => {
                 const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-                setAudioBlob(blob);
-                
-                // Prepare Player
-                if (audioPlayerRef.current) {
-                    audioPlayerRef.current.pause();
-                    URL.revokeObjectURL(audioPlayerRef.current.src);
-                }
-                const url = URL.createObjectURL(blob);
-                const audio = new Audio(url);
-                // Important for mobile: Load immediately
-                audio.load();
-                audio.onended = () => { setIsPlaying(false); setProgress(0); };
-                audioPlayerRef.current = audio;
+                setupAudioPlayer(blob);
             };
             
             mediaRecorder.start();
             mediaRecorderRef.current = mediaRecorder;
 
+            // Setup Buffers
             const MAX_FRAMES = 1800; 
             historyRef.current = new Uint8Array(MAX_FRAMES * FREQ_BINS);
             frameCountRef.current = 0;
-            
             startTimeRef.current = Date.now();
+            
             setIsRecording(true);
             setAudioBlob(null);
             setGeometry(null);
@@ -101,26 +114,27 @@ export const useAudioLogic = () => {
         }
     };
 
-    // --- 2. LOOP ---
+    // --- 2. LOOP (Recording) ---
     const analyzeLoop = () => {
         if (!analyserRef.current || !historyRef.current) return;
         const buffer = new Uint8Array(FREQ_BINS);
         analyserRef.current.getByteFrequencyData(buffer);
+        
+        // Store data
         const offset = frameCountRef.current * FREQ_BINS;
         if (offset + FREQ_BINS < historyRef.current.length) {
              historyRef.current.set(buffer, offset);
              frameCountRef.current++;
         }
+        
         setDuration((Date.now() - startTimeRef.current) / 1000);
         rafRef.current = requestAnimationFrame(analyzeLoop);
     };
 
-    // --- 3. STOP ---
+    // --- 3. STOP RECORDING ---
     const stopRecording = () => {
         if (audioContextRef.current) {
-            // Don't close context, just suspend to keep it alive for playback later
             audioContextRef.current.suspend(); 
-            
             if (rafRef.current) cancelAnimationFrame(rafRef.current);
             if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
                 mediaRecorderRef.current.stop();
@@ -143,29 +157,34 @@ export const useAudioLogic = () => {
         setProgress(0);
 
         try {
-            await ensureAudioContext(); // Ensure context exists
+            // Need AudioContext to decode data for geometry generation
+            if (!audioContextRef.current) {
+                const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+                audioContextRef.current = new AudioContextClass();
+            }
+            // Note: We do NOT await resume() here strictly, we just need decodeAudioData which works anyway usually.
             
             const arrayBuffer = await file.arrayBuffer();
-            const audioBuffer = await audioContextRef.current!.decodeAudioData(arrayBuffer);
+            const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
             
-            // Offline Processing
+            // --- OFFLINE PROCESSING (Fast Forward) ---
             const offlineCtx = new OfflineAudioContext(1, audioBuffer.length, audioBuffer.sampleRate);
             const source = offlineCtx.createBufferSource();
             source.buffer = audioBuffer;
             const analyser = offlineCtx.createAnalyser();
             analyser.fftSize = FREQ_BINS * 2;
-            analyser.smoothingTimeConstant = 0.5;
             source.connect(analyser);
             analyser.connect(offlineCtx.destination);
             source.start(0);
 
-            const fps = 30;
+            const fps = 30; // Sample rate for the visual mesh
             const totalFrames = Math.floor(audioBuffer.duration * fps);
             const interval = 1 / fps;
             const capturedData = new Uint8Array(totalFrames * FREQ_BINS);
             const tempArray = new Uint8Array(FREQ_BINS);
 
             for (let i = 0; i < totalFrames; i++) {
+                // "Scrub" the offline context
                 offlineCtx.suspend(i * interval).then(() => {
                     analyser.getByteFrequencyData(tempArray);
                     capturedData.set(tempArray, i * FREQ_BINS);
@@ -174,23 +193,14 @@ export const useAudioLogic = () => {
 
             await offlineCtx.startRendering();
 
+            // Set Data
             historyRef.current = capturedData;
             frameCountRef.current = totalFrames;
             setDuration(audioBuffer.duration);
             
-            // Setup Player
-            const blob = new Blob([await file.arrayBuffer()], { type: file.type || 'audio/mp3' });
-            setAudioBlob(blob);
-            
-            if (audioPlayerRef.current) {
-                audioPlayerRef.current.pause();
-                URL.revokeObjectURL(audioPlayerRef.current.src);
-            }
-            const url = URL.createObjectURL(blob);
-            const audio = new Audio(url);
-            audio.load(); // Vital for mobile
-            audio.onended = () => { setIsPlaying(false); setProgress(0); };
-            audioPlayerRef.current = audio;
+            // Setup Playback Blob
+            const blob = new Blob([await file.arrayBuffer()], { type: file.type });
+            setupAudioPlayer(blob);
 
             updateGeometry(capturedData, totalFrames, 10, 15, 1.0, 3.0, 0, 1, 0.5, true);
             
@@ -202,55 +212,74 @@ export const useAudioLogic = () => {
         }
     };
 
-    // --- 5. PLAYBACK (FIXED FOR MOBILE) ---
-    const togglePlayback = async (startPct: number, endPct: number) => {
+    // --- 5. PLAYBACK (MOBILE FIX) ---
+    // NO ASYNC allowed before .play()
+    const togglePlayback = (startPct: number, endPct: number) => {
         if (!audioPlayerRef.current) return;
-
-        // MOBILE FIX: Resume context on user click
-        await ensureAudioContext();
+        const audio = audioPlayerRef.current;
 
         if (isPlaying) {
-            audioPlayerRef.current.pause();
+            // PAUSE
+            audio.pause();
             setIsPlaying(false);
+            if (playbackRafRef.current) cancelAnimationFrame(playbackRafRef.current);
         } else {
-            const totalDur = audioPlayerRef.current.duration;
-            if (!totalDur || !isFinite(totalDur)) { 
-                // Force play to trigger metadata load if needed
-                audioPlayerRef.current.play().catch(e => console.error("Play error", e));
-                setIsPlaying(true); 
-                return; 
+            // PLAY
+            // 1. Calculate Start Position
+            const totalDur = audio.duration;
+            
+            // Safety check for infinite duration (sometimes happens on streaming/loading)
+            if (!isFinite(totalDur)) {
+                 // Try to just play from 0 if metadata missing
+                 audio.currentTime = 0;
+            } else {
+                 // If we are outside the trim zone, jump to start
+                 if (progress >= endPct || progress < startPct) {
+                    audio.currentTime = totalDur * startPct;
+                 } else {
+                    audio.currentTime = totalDur * progress;
+                 }
             }
 
-            audioPlayerRef.current.currentTime = totalDur * startPct;
-            
-            // Promise handling for mobile play
-            audioPlayerRef.current.play()
-                .then(() => {
-                    setIsPlaying(true);
-                    // Start Tracking
-                    const checkInterval = setInterval(() => {
-                        if (!audioPlayerRef.current || audioPlayerRef.current.paused) { 
-                            clearInterval(checkInterval); 
-                            return; 
-                        }
-                        const current = audioPlayerRef.current.currentTime;
-                        const stopTime = totalDur * endPct;
+            // 2. TRIGGER PLAY IMMEDIATELY (Vital for Mobile)
+            // We store the promise to catch errors, but we don't await it to block UI
+            const playPromise = audio.play();
+
+            if (playPromise !== undefined) {
+                playPromise
+                    .then(() => {
+                        // Success! Now we update state and start the loop
+                        setIsPlaying(true);
                         
-                        setProgress(current / totalDur);
-                        
-                        if (current >= stopTime) {
-                            audioPlayerRef.current.pause();
-                            setIsPlaying(false);
-                            setProgress(startPct); // Reset dot
-                            clearInterval(checkInterval);
-                        }
-                    }, 30); // 30ms for smoother UI updates
-                })
-                .catch(e => console.error("Playback failed (Mobile restriction?)", e));
+                        // Start Animation Loop
+                        const loop = () => {
+                            if (!audio || audio.paused) return;
+                            
+                            const current = audio.currentTime;
+                            const duration = audio.duration || 1; // Prevent divide by zero
+                            const stopTime = duration * endPct;
+                            
+                            setProgress(current / duration);
+
+                            if (current >= stopTime) {
+                                audio.pause();
+                                setIsPlaying(false);
+                                setProgress(startPct); // Snap back to visual start
+                            } else {
+                                playbackRafRef.current = requestAnimationFrame(loop);
+                            }
+                        };
+                        playbackRafRef.current = requestAnimationFrame(loop);
+                    })
+                    .catch(error => {
+                        console.error("Playback prevented:", error);
+                        setIsPlaying(false);
+                    });
+            }
         }
     };
 
-    // --- 6. GEOMETRY ---
+    // --- 6. GEOMETRY GENERATOR (Unchanged) ---
     const updateGeometry = useCallback((
         data: Uint8Array, 
         totalRows: number,
@@ -274,6 +303,7 @@ export const useAudioLogic = () => {
         const endIdx = endRow * FREQ_BINS;
         const rawSlice = data.slice(startIdx, endIdx);
 
+        // Resolution Downsampling
         const stride = Math.max(1, Math.floor(1 / resolution));
         let finalData = rawSlice;
         let finalRows = rowCount;
@@ -295,13 +325,14 @@ export const useAudioLogic = () => {
         setGeometry(geom);
     }, []);
 
+    // Cleanup
     useEffect(() => {
         return () => {
-            // Cleanup logic
-            if (audioPlayerRef.current) { 
-                audioPlayerRef.current.pause(); 
-                URL.revokeObjectURL(audioPlayerRef.current.src); 
+            if (audioPlayerRef.current) {
+                audioPlayerRef.current.pause();
+                audioPlayerRef.current.src = "";
             }
+            if (playbackRafRef.current) cancelAnimationFrame(playbackRafRef.current);
         };
     }, []);
 
