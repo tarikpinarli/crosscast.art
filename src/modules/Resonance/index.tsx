@@ -15,6 +15,7 @@ import { WaveformTrimmer } from './components/WaveformTrimmer';
 // --- SEO IMPORTS ---
 import { SeoHead } from '../../components/seo/SeoHead';
 import { SEO_CONFIG } from '../../config/seoConfig';
+import { ResonanceInfo } from './components/ResonanceInfo';
 
 export default function ResonanceModule() {
     const { showModal, clientSecret, startCheckout, closeModal } = usePayment('resonance-basic');
@@ -113,7 +114,6 @@ export default function ResonanceModule() {
         <>
             {/* --- INJECT SEO TAGS HERE --- */}
             <SeoHead {...SEO_CONFIG.resonance} />
-
             <ModuleLayout
                 title="Resonance Engine"
                 subtitle={hasAccess ? "UNLOCKED // SESSION ACTIVE" : "Frequency Landscape Generator"}
@@ -226,6 +226,7 @@ export default function ResonanceModule() {
                     length={length}
                 />
             </ModuleLayout>
+            <ResonanceInfo />
 
             {showModal && <PaymentModal clientSecret={clientSecret} onClose={closeModal} onSuccess={handlePaymentSuccess} color="purple" price="$0.99" />}
             <div className="hidden border-purple-500/20 border-t-purple-500 bg-purple-500/20 text-purple-500/60 bg-purple-900/20 border-purple-400/50 from-purple-900/10"></div>
