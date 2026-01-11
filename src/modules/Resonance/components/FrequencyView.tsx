@@ -37,9 +37,9 @@ const LandscapeMesh = ({ geometry, color, isPlaying, playbackProgress, trimStart
         uTrimEnd: { value: 1 },    
         uIsPlaying: { value: 0 },
         uLength: { value: length },
-        uScanColor: { value: new THREE.Color('#ffffff') }, // Made brighter for visibility
+        uScanColor: { value: new THREE.Color('#ffffff') }, 
         uBaseColor: { value: new THREE.Color(color) }
-    }), [color, length]); // Added length dependency
+    }), [color, length]);
 
     useFrame(({ clock }) => {
         if (materialRef.current && materialRef.current.uniforms) {
@@ -48,7 +48,7 @@ const LandscapeMesh = ({ geometry, color, isPlaying, playbackProgress, trimStart
             mat.uniforms.uPlayhead.value = THREE.MathUtils.lerp(
                 mat.uniforms.uPlayhead.value,
                 playbackProgress,
-                0.5 // Faster lerp for snappier response
+                0.5 // Faster lerp for mobile response
             );
             mat.uniforms.uIsPlaying.value = isPlaying ? 1.0 : 0.0;
             mat.uniforms.uTrimStart.value = trimStart;
@@ -76,14 +76,14 @@ const LandscapeMesh = ({ geometry, color, isPlaying, playbackProgress, trimStart
             uniform float uLength;
             uniform vec3 uScanColor;
             uniform vec3 uBaseColor;
-            varying vec3 vLocalPosition; // Changed name to indicate local space
+            varying vec3 vLocalPosition; 
         ` + shader.fragmentShader;
 
         shader.vertexShader = `
             varying vec3 vLocalPosition;
         ` + shader.vertexShader;
         
-        // Capture LOCAL position before matrix transformations
+        // FIX: Capture LOCAL position for accurate scanning regardless of Stage transforms
         shader.vertexShader = shader.vertexShader.replace(
             '#include <begin_vertex>',
             `
@@ -98,25 +98,15 @@ const LandscapeMesh = ({ geometry, color, isPlaying, playbackProgress, trimStart
             #include <dithering_fragment>
             
             if (uIsPlaying > 0.5) {
-                // Determine scan Z position (Local Space)
-                // Mesh is centered at Z=0, ranging from -length/2 to +length/2
                 float halfLength = uLength / 2.0;
-                
                 // Map local Z to 0..1 range
                 float normalizedZ = (vLocalPosition.z + halfLength) / uLength;
-                
-                // Audio plays forward (Top to Bottom visually, usually -Z to +Z or vice versa)
-                // Depending on generation, flip this if scan goes backwards
                 normalizedZ = 1.0 - clamp(normalizedZ, 0.0, 1.0); 
 
-                // Calculate where the playhead is relative to the trim
                 float meshDuration = uTrimEnd - uTrimStart;
                 float relativePlayhead = (uPlayhead - uTrimStart) / meshDuration;
                 
-                // Draw Line
                 float dist = abs(normalizedZ - relativePlayhead);
-                
-                // Sharp scan line with glow
                 float scanline = smoothstep(0.02, 0.0, dist); 
                 
                 vec3 finalScanColor = mix(gl_FragColor.rgb, uScanColor, scanline * 0.8);
@@ -138,7 +128,6 @@ const LandscapeMesh = ({ geometry, color, isPlaying, playbackProgress, trimStart
                     onBeforeCompile={onBeforeCompile}
                 />
             </mesh>
-            {/* Wireframe Overlay */}
             <mesh geometry={geometry} position={[0, 0.005, 0]}>
                  <meshBasicMaterial color="white" wireframe={true} transparent opacity={0.08} />
             </mesh>
@@ -146,7 +135,6 @@ const LandscapeMesh = ({ geometry, color, isPlaying, playbackProgress, trimStart
     );
 };
 
-// --- REST OF COMPONENT (Unchanged, just ensuring export) ---
 const RecordingViz = () => {
     return (
         <group>

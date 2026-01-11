@@ -16,10 +16,9 @@ export default function ResonanceModule() {
     const { showModal, clientSecret, startCheckout, closeModal } = usePayment('resonance-basic');
     const [hasAccess, setHasAccess] = useState(false);
 
-    // Get isProcessing and importAudioFile
-    const { isRecording, isProcessing, isPlaying, progress, duration, hasRecording, geometry, dataRef, actions, audioBlob } = useAudioLogic();
+    // Get debugMsg here
+    const { isRecording, isProcessing, isPlaying, progress, duration, hasRecording, geometry, dataRef, actions, audioBlob, debugMsg } = useAudioLogic();
 
-    // UI Refs for File Upload
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Params
@@ -30,47 +29,38 @@ export default function ResonanceModule() {
     const [resolution, setResolution] = useState(0.5); 
     const [isMirrored, setIsMirrored] = useState(true);
 
-    // Trim Params
     const [trimStart, setTrimStart] = useState(0);
     const [trimEnd, setTrimEnd] = useState(100);
 
     const handleTrimChange = (start: number, end: number) => { setTrimStart(start); setTrimEnd(end); };
     
-    // Handle File Selection
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             actions.importAudioFile(e.target.files[0]);
         }
     };
 
-    // Auto-update geometry
     useEffect(() => {
         if (hasRecording && dataRef.buffer) {
             const timer = setTimeout(() => {
                 const recordedLen = dataRef.rows * 64; 
                 const safeBuffer = dataRef.buffer!.slice(0, recordedLen);
-                
                 actions.updateGeometry(safeBuffer, dataRef.rows, width, length, baseThickness, gain, trimStart/100, trimEnd/100, resolution, isMirrored);
             }, 50);
             return () => clearTimeout(timer);
         }
     }, [width, length, baseThickness, gain, trimStart, trimEnd, resolution, isMirrored, hasRecording]);
 
-    // --- UPDATED: GLB Export Logic ---
     const handleDownload = () => { 
         if (!geometry) return; 
-
-        // 1. Create Mesh with FLAT SHADING (The Fix)
         const material = new THREE.MeshStandardMaterial({
-            color: 0xa855f7, // Purple
+            color: 0xa855f7,
             roughness: 0.4,
             metalness: 0.3,
-            flatShading: true, // <--- PRESERVES "LOW POLY" DETAIL
+            flatShading: true, 
             side: THREE.DoubleSide
         });
         const mesh = new THREE.Mesh(geometry, material);
-
-        // 2. Export to GLB
         const exporter = new GLTFExporter();
         exporter.parse(
             mesh,
@@ -103,19 +93,9 @@ export default function ResonanceModule() {
                     <div className="space-y-6">
                         {hasAccess && ( <div className="bg-emerald-500/10 border border-emerald-500/50 p-3 rounded-sm flex items-center gap-3 animate-in fade-in"> <CheckCircle2 size={16} className="text-emerald-500" /> <div> <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Session Unlocked</p> <p className="text-[9px] text-zinc-500 uppercase">Downloads are free</p> </div> </div> )}
 
-                        {/* INPUT CONTROLS */}
                         <div className="bg-zinc-900/50 p-4 rounded-lg border border-white/5 text-center space-y-4">
-                            
-                            {/* Hidden File Input */}
-                            <input 
-                                type="file" 
-                                ref={fileInputRef} 
-                                onChange={handleFileSelect} 
-                                accept="audio/*" 
-                                className="hidden" 
-                            />
+                            <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept="audio/*" className="hidden" />
 
-                            {/* MAIN DISPLAY */}
                             {isProcessing ? (
                                 <div className="flex flex-col items-center justify-center h-16 animate-pulse text-purple-400 gap-2">
                                     <Loader2 size={32} className="animate-spin" />
@@ -127,11 +107,8 @@ export default function ResonanceModule() {
                                 </div>
                             )}
                             
-                            {/* BUTTONS ROW */}
                             {!isProcessing && (
                                 <div className="flex justify-center gap-4 items-center">
-                                    
-                                    {/* UPLOAD BUTTON */}
                                     {!isRecording && (
                                         <button 
                                             onClick={() => fileInputRef.current?.click()}
@@ -142,7 +119,6 @@ export default function ResonanceModule() {
                                         </button>
                                     )}
 
-                                    {/* RECORD BUTTON */}
                                     {!isRecording ? (
                                         <button onClick={actions.startRecording} className="w-20 h-20 rounded-full bg-red-600 hover:bg-red-500 flex items-center justify-center shadow-[0_0_20px_rgba(220,38,38,0.4)] transition-all active:scale-95 group">
                                             <Mic className="text-white w-8 h-8 group-hover:scale-110 transition-transform" />
@@ -158,9 +134,15 @@ export default function ResonanceModule() {
                             <p className="text-[10px] text-zinc-500 uppercase tracking-widest">
                                 {isRecording ? "Listening..." : isProcessing ? "Please Wait" : "Record or Upload"}
                             </p>
+
+                            {/* DEBUG MESSAGE UI */}
+                            {debugMsg && (
+                                <div className="p-2 bg-red-900/50 border border-red-500 text-red-200 text-xs font-mono rounded mt-2">
+                                    DEBUG: {debugMsg}
+                                </div>
+                            )}
                         </div>
 
-                        {/* WAVEFORM EDITOR */}
                         {hasRecording && !isProcessing && (
                              <div className="animate-in fade-in slide-in-from-top-4">
                                 <WaveformTrimmer 
@@ -175,7 +157,6 @@ export default function ResonanceModule() {
                              </div>
                         )}
 
-                        {/* SLIDERS */}
                         <div className={`space-y-5 transition-opacity duration-500 ${!hasRecording || isProcessing ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}>
                              <div className="h-px bg-zinc-800"></div>
 

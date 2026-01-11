@@ -3,11 +3,11 @@ import { Play, Pause } from 'lucide-react';
 
 interface WaveformTrimmerProps {
     audioBlob: Blob | null;
-    trimStart: number; // Expects 0.0 to 1.0
-    trimEnd: number;   // Expects 0.0 to 1.0
+    trimStart: number;
+    trimEnd: number;  
     playbackProgress: number; 
     isPlaying: boolean;
-    onTrimChange: (start: number, end: number) => void; // Expects 0-100 to be sent back
+    onTrimChange: (start: number, end: number) => void;
     onTogglePlay: () => void;
 }
 
@@ -25,7 +25,6 @@ export const WaveformTrimmer = ({
     const [peaks, setPeaks] = useState<number[]>([]);
     const [isDragging, setIsDragging] = useState<'start' | 'end' | null>(null);
 
-    // 1. PROCESS AUDIO
     useEffect(() => {
         if (!audioBlob) return;
         const processAudio = async () => {
@@ -56,7 +55,6 @@ export const WaveformTrimmer = ({
         processAudio();
     }, [audioBlob]);
 
-    // 2. DRAW
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas || peaks.length === 0) return;
@@ -70,7 +68,6 @@ export const WaveformTrimmer = ({
 
         ctx.clearRect(0, 0, w, h);
 
-        // Draw Bars
         peaks.forEach((peak, i) => {
             const x = i * barWidth;
             const barH = Math.max(4, peak * h * 0.8);
@@ -91,7 +88,6 @@ export const WaveformTrimmer = ({
             ctx.fill();
         });
 
-        // Overlay & Handles
         const startX = trimStart * w;
         const endX = trimEnd * w;
 
@@ -115,7 +111,6 @@ export const WaveformTrimmer = ({
         }
     }, [peaks, trimStart, trimEnd, playbackProgress]);
 
-    // --- SHARED CALCULATION LOGIC ---
     const calculatePct = (clientX: number) => {
         if (!containerRef.current) return 0;
         const rect = containerRef.current.getBoundingClientRect();
@@ -123,7 +118,6 @@ export const WaveformTrimmer = ({
         return Math.max(0, Math.min(1, x / rect.width));
     };
 
-    // --- MOUSE HANDLERS ---
     const handleMouseDown = (e: React.MouseEvent) => {
         const pct = calculatePct(e.clientX);
         const threshold = 0.05;
@@ -137,24 +131,20 @@ export const WaveformTrimmer = ({
         updateTrim(pct);
     };
 
-    // --- TOUCH HANDLERS (FIX FOR MOBILE) ---
     const handleTouchStart = (e: React.TouchEvent) => {
-        // Prevent scrolling while starting to drag
         const pct = calculatePct(e.touches[0].clientX);
-        const threshold = 0.1; // Larger hit area for fingers
+        const threshold = 0.1; 
         if (Math.abs(pct - trimStart) < threshold) setIsDragging('start');
         else if (Math.abs(pct - trimEnd) < threshold) setIsDragging('end');
     };
 
     const handleTouchMove = (e: React.TouchEvent) => {
         if (!isDragging) return;
-        // e.preventDefault(); // Stop page scrolling while dragging handle
         const pct = calculatePct(e.touches[0].clientX);
         updateTrim(pct);
     };
 
     const updateTrim = (pct: number) => {
-        // Parent expects 0-100 range
         if (isDragging === 'start') {
             const newStart = Math.min(pct, trimEnd - 0.05);
             onTrimChange(newStart * 100, trimEnd * 100); 
@@ -185,12 +175,10 @@ export const WaveformTrimmer = ({
                  <div 
                     ref={containerRef}
                     className="flex-1 h-12 relative cursor-ew-resize touch-none"
-                    // MOUSE
                     onMouseDown={handleMouseDown}
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleStop}
                     onMouseLeave={handleStop}
-                    // TOUCH
                     onTouchStart={handleTouchStart}
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleStop}
