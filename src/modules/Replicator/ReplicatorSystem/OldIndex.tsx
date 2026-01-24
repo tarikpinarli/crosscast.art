@@ -10,7 +10,7 @@ import { usePayment } from '../../../hooks/usePayment';
 import { Cpu, ScanLine, Smartphone, Box, Loader2, Download, Camera, Lock, AlertTriangle, XCircle } from 'lucide-react';
 
 // --- CONFIGURATION ---
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "https://replicator-backend.onrender.com";
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "https://dualsculp-backend-go.onrender.com";
 
 const FRONTEND_HOST = import.meta.env.PROD
     ? window.location.origin

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Copy, Box, Mountain, ArrowRight, ShieldCheck, Cpu, Activity, Zap, Layers, AudioLines, Type } from 'lucide-react'; // Added Type
 import { Header } from '../components/layout/Header';
 import { Footer } from '../components/layout/Footer';
+import { SeoHead } from '../components/seo/SeoHead';
 
 const MODULES = [
   { 
@@ -123,6 +124,11 @@ const ManifestoSection = () => (
 export default function Landing() {
   return (
     <div className="bg-zinc-950 text-zinc-200 font-sans selection:bg-cyan-500 selection:text-black relative overflow-x-hidden">
+      <SeoHead 
+        title="CrossCast | Generative Manufacturing Protocol"
+        description="Stop printing trinkets. Manufacture Physical Value. CrossCast provides the computational bridge for high-value additive manufacturing."
+        keywords="generative design, 3d printing, stl generator, manifold mesh, crosscast, manufacturing protocol, lithophane, topography"
+      />
       <Header />
       
       {/* Dynamic Grid Background */}

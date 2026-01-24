@@ -1,0 +1,14 @@
+Flask
+Flask-Cors
+Flask-SocketIO
+eventlet
+gunicorn
+numpy
+scipy
+trimesh
+opencv-python-headless
+scikit-image
+Pillow
+requests
+python-dotenv
+stripe

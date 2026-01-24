@@ -1,7 +1,5 @@
 import { useState } from 'react';
-
-// Use the same backend URL as Replicator/index.tsx
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "https://replicator-backend.onrender.com";
+import { BACKEND_URL } from '../config';
 
 interface PaymentState {
   showModal: boolean;

@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { BACKEND_URL } from './config'; // <--- IMPORT HERE
 
 // --- MARKETING PAGES ---
 import Landing from './pages/Landing';
@@ -30,15 +31,13 @@ function ScrollToTop() {
   return null;
 }
 
-const BACKEND_URL = "https://replicator-backend.onrender.com"; 
 
 function App() {
   useEffect(() => {
     const warmUp = async () => {
       try {
-        // ✅ Ping the real server, not ngrok
         await fetch(`${BACKEND_URL}/ping`); 
-        console.log("📡 Server wake-up signal sent.");
+        console.log("📡 Server wake-up signal sent to:", BACKEND_URL);
       } catch (e) {
         console.log("Wake-up failed (silent fail).");
       }
