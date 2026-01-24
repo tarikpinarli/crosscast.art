@@ -1,7 +1,6 @@
 package handlers
 
 import (
-    "net/http"
     "path/filepath"
     "github.com/gin-gonic/gin"
     "github.com/stripe/stripe-go/v76"
