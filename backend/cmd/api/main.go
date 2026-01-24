@@ -26,7 +26,7 @@ func main() {
     }))
 
     h := handlers.NewHandler(cfg)
-    api := r.Group("/api")
+    api := r.Group("/")
     {
         api.GET("/ping", func(c *gin.Context) { c.String(200, "pong") })
         api.GET("/check-availability", h.CheckAvailability)
