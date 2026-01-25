@@ -7,20 +7,20 @@ export default defineConfig(({ command }) => {
   return {
     plugins: [
       react(),
-      // ✅ THE FIX: This spread syntax tells TS "If serve mode, add this array. If not, add nothing."
       ...(command === 'serve' ? [basicSsl()] : []),
     ],
     server: {
-      host: true,
+      host: '127.0.0.1',
+      port: 5173,
       proxy: {
         '/socket.io': {
-          target: 'http://localhost:5005',
+          target: 'http://127.0.0.1:5005',
           changeOrigin: true,
           secure: false,
           ws: true,
         },
         '/files': {
-          target: 'http://localhost:5005',
+          target: 'http://127.0.0.1:5005',
           changeOrigin: true,
           secure: false,
         },
