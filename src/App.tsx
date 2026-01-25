@@ -18,10 +18,6 @@ import IntersectionModule from './modules/Intersection';
 import ResonanceModule from './modules/Resonance';
 import TypographyModule from './modules/Typography';
 
-// --- NEW REPLICATOR MODULE ---
-import Replicator from './modules/Replicator/ReplicatorSystem';
-import MobileSensor from './modules/Replicator/MobileSensor';
-
 // --- UTILS ---
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -65,11 +61,7 @@ function App() {
           <Route path="/hub" element={<Hub />} />
           <Route path="/resonance" element={<ResonanceModule />} />
           <Route path="/typography" element={<TypographyModule />} />
-          
 
-          {/* REPLICATOR ENGINE (New) */}
-          <Route path="/replicator" element={<Replicator />} />
-          <Route path="/sensor/:id" element={<MobileSensor />} />
 
           {/* 404 CATCH-ALL */}
           <Route 

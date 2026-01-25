@@ -15,7 +15,7 @@ func main() {
 	cfg := config.LoadConfig()
 
 	io := socket.NewServer(nil, nil)
-	sockets.SetupSocket(io, cfg)
+	sockets.SetupSocket(io)
 	sockHandler := io.ServeHandler(nil)
 
 	r := gin.Default()
@@ -33,7 +33,6 @@ func main() {
 		api.GET("/ping", func(c *gin.Context) { c.String(200, "pong") })
 		api.GET("/check-availability", h.CheckAvailability)
         api.POST("/create-payment-intent", h.CreatePaymentIntent)
-        api.GET("/files/:room_id/:filename", h.ServeFiles)
 	}
 
 	r.Any("/socket.io/*any", gin.WrapH(sockHandler))

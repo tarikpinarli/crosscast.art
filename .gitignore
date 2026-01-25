@@ -28,4 +28,4 @@ dist-ssr
 __pycache__/
 *.pyc
 .venv/
-scans/backend_python_backup/
+backend_python_backup/

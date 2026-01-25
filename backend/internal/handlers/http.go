@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"path/filepath"
 	"github.com/gin-gonic/gin"
 	"github.com/stripe/stripe-go/v76"
 	"github.com/stripe/stripe-go/v76/paymentintent"
@@ -10,7 +9,10 @@ import (
 
 var ModulePrices = map[string]int64{
 	"intersection-basic": 99,
-	"replicator-model":   299,
+	"wall-art-basic": 99,
+	"geo-sculptor-basic": 199,
+	"resonance-basic": 99,
+	"typography-basic": 99,
 }
 
 type Handler struct { Config *config.Config }
@@ -45,10 +47,4 @@ func (h *Handler) CreatePaymentIntent(c *gin.Context) {
 		return
 	}
 	c.JSON(200, gin.H{"clientSecret": pi.ClientSecret})
-}
-
-func (h *Handler) ServeFiles(c *gin.Context) {
-	roomID := c.Param("room_id")
-	filename := c.Param("filename")
-	c.File(filepath.Join(h.Config.UploadFolder, roomID, filename))
 }
