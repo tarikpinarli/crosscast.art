@@ -17,9 +17,9 @@
     <br />
     <a href="https://crosscast.art">View Demo</a>
     ·
-    <a href="https://github.com/tarikpinarli/crosscast/issues">Report Bug</a>
+    <a href="https://github.com/tarikpinarli/crosscast.art/issues">Report Bug</a>
     ·
-    <a href="https://github.com/tarikpinarli/crosscast/issues">Request Feature</a>
+    <a href="https://github.com/tarikpinarli/crosscast.art/issues">Request Feature</a>
   </p>
 </div>
 
