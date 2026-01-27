@@ -37,6 +37,13 @@ The project bridges the gap between digital creativity and physical manufacturin
 | :---: | :---: | :---: |
 | ![Voice Input](public/readme_screenshots/voice_first.webp) | ![Voice Waveform](public/readme_screenshots/voice_seconf.webp) | ![Voice Model](public/readme_screenshots/voice.webp) |
 
+### 4. Commerce Integration
+> *Secure, integrated payment gateway. Seamlessly handles session tokens and manufacturing licenses via Stripe. Note: A secure payment is required to unlock and download the final manufacturing-ready 3D model files.*
+
+| **Secure Checkout** |
+| :---: |
+| ![Stripe Checkout](public/readme_screenshots/stripe_payment.webp) |
+
 ---
 
 ## Project Description & Design Choices
