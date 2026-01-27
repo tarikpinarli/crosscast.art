@@ -14,6 +14,20 @@ The project bridges the gap between digital creativity and physical manufacturin
 
 ---
 
+## 📸 Interface Showcase
+
+| **Shadow Caster** | **Terra-Former** |
+| :--- | :--- |
+| *Bespoke CSG intersection logic. Calculates the volumetric overlap of dual silhouettes.* | *Streaming GIS telemetry reconstruction. Converts elevation data into topographic models.* |
+| ![Shadow Caster](public/readme_screenshots/shadow_isometric.webp) | ![Terra Former](public/readme_screenshots/geo_buildings_isometric.webp) |
+
+| **Resonance (Voice to 3D)** |
+| :--- |
+| *Spectral audio analysis. Materializes voice recordings and sound waves into solid 3D frequency landscapes.* |
+| ![Voice to 3D](public/readme_screenshots/voice.webp) |
+
+---
+
 ## Project Description & Design Choices
 
 This project operates as a full-stack application split into two distinct services: a React frontend and a Go (Golang) backend.
