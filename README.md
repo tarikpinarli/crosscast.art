@@ -1,5 +1,27 @@
 *This project has been created by Tarik Pinarli*
 
+<div align="center">
+  <a href="https://crosscast.art">
+    <img src="public/favicon.png" alt="CrossCast Logo" width="200" height="auto">
+  </a>
+
+  <h1 align="center">CrossCast | Generative Design Suite</h1>
+
+  <p align="center">
+    <b>Stop printing trinkets. Start manufacturing meaning.</b>
+    <br />
+    <br />
+    <a href="https://crosscast.art"><strong>Explore the Live Demo »</strong></a>
+    <br />
+    <br />
+    <a href="https://crosscast.art">View Demo</a>
+    ·
+    <a href="https://github.com/tarikpinarli/crosscast/issues">Report Bug</a>
+    ·
+    <a href="https://github.com/tarikpinarli/crosscast/issues">Request Feature</a>
+  </p>
+</div>
+
 # CrossCast | Generative Design Suite
 
 **Live Demo:** [https://crosscast.art](https://crosscast.art)
