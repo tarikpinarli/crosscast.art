@@ -38,14 +38,14 @@ The project bridges the gap between digital creativity and physical manufacturin
 ### 1. Shadow Caster (Intersection Engine)
 > *Bespoke CSG intersection logic. Calculates the volumetric overlap of dual silhouettes to create complex geometry from simple 2D inputs.*
 
-| **Profile View** | **Front View** | **Resulting Mesh** |
+| **Isometric View** | **Front View** | **Side View** |
 | :---: | :---: | :---: |
 | ![Shadow Profile](public/readme_screenshots/shadow_isometric.webp) | ![Shadow Front](public/readme_screenshots/shadow_front.webp) | ![Shadow Result](public/readme_screenshots/shadow_side.webp) |
 
 ### 2. Terra-Former (GeoSculptor)
 > *Streaming GIS telemetry reconstruction. Converts raw satellite elevation data into high-fidelity topographic models ready for printing.*
 
-| **Map Selection** | **Terrain Analysis** | **3D Generation** |
+| **Map Selection** | **Satalite View** | **3D View** |
 | :---: | :---: | :---: |
 | ![Geo Map](public/readme_screenshots/geo_map.webp) | ![Geo Analysis](public/readme_screenshots/geo_buildings_satalite.webp) | ![Geo Model](public/readme_screenshots/geo_buildings_isometric.webp) |
 
