@@ -72,16 +72,13 @@ This project operates as a full-stack application split into two distinct servic
 ### Main Design Choices
 1.  **Backend Migration to Go:** The backend was explicitly converted to **Go (Golang)** to satisfy the requirements for the **Wolt Internship** application. This choice leverages Go's concurrency model and performance, which is ideal for handling the real-time socket connections used in the application.
 2.  **Client-Side Generation:** Heavy geometry processing (Three.js/React Three Fiber) is offloaded to the client to reduce server costs and provide instant visual feedback to the user.
-3.  **Dockerization:** Docker is used to containerize the Go backend. This ensures that the application runs identically on the developer's local machine and the production server (Render), eliminating "it works on my machine" issues.
-4.  **Deployment Strategy:**
+3.  **Deployment Strategy:**
     * **Frontend:** Deployed on **Vercel** for its seamless React integration.
     * **Backend:** Deployed on **Render**. Since the free tier is used, the server spins down after inactivity. A **cronjob** has been implemented to ping the backend every 5 minutes, ensuring high availability.
 
-### Comparison: Secrets vs. Environment Variables
-In the development of this project, distinct approaches were used to handle configuration data:
+### Secrets
 
-* **Environment Variables:** These are key-value pairs used to configure the application's behavior based on where it is running (e.g., `PORT=5005` or `BACKEND_URL`). In this project, `config.ts` uses environment variables to automatically switch between `localhost` (DEV) and the Render URL (PROD). These are generally visible in the deployment configuration but should not contain sensitive data in plain text if the repo is public.
-* **Secrets:** These are strictly confidential pieces of information, such as the **Stripe Secret Key** or **Mapbox Access Token**. Unlike standard environment variables which might be checked into non-public files or logs, secrets must never be committed to version control (`git`). In this project, secrets are injected directly into the Vercel and Render dashboards at runtime and accessed via `process.env` or `os.Getenv`, ensuring they remain secure.
+* **Secrets:** These are strictly confidential pieces of information, such as the **Stripe Secret Key** or **Mapbox Access Token**. In this project, secrets are injected directly into the Vercel and Render dashboards at runtime and accessed via `process.env` or `os.Getenv`, ensuring they remain secure.
 
 ### Included Sources
 The repository contains:
