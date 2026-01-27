@@ -1,9 +1,10 @@
-*This project has been created by Tarik Pinarli*
-
 <div align="center">
   <a href="https://crosscast.art">
-    <img src="public/readme_screenshots/readmehero.webp" alt="CrossCast Logo" width="200" height="auto">
+    <img src="public/readme_screenshots/readmehero.webp" alt="CrossCast Hero" width="100%">
   </a>
+
+  <br />
+  <br />
 
   <h1 align="center">CrossCast | Generative Design Suite</h1>
 
@@ -21,10 +22,6 @@
     <a href="https://github.com/tarikpinarli/crosscast/issues">Request Feature</a>
   </p>
 </div>
-
-# CrossCast | Generative Design Suite
-
-**Live Demo:** [https://crosscast.art](https://crosscast.art)
 
 ## Description
 
