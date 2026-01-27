@@ -16,15 +16,26 @@ The project bridges the gap between digital creativity and physical manufacturin
 
 ## 📸 Interface Showcase
 
-| **Shadow Caster** | **Terra-Former** |
-| :--- | :--- |
-| *Bespoke CSG intersection logic. Calculates the volumetric overlap of dual silhouettes.* | *Streaming GIS telemetry reconstruction. Converts elevation data into topographic models.* |
-| ![Shadow Caster](public/readme_screenshots/shadow_isometric.webp) | ![Terra Former](public/readme_screenshots/geo_buildings_isometric.webp) |
+### 1. Shadow Caster (Intersection Engine)
+> *Bespoke CSG intersection logic. Calculates the volumetric overlap of dual silhouettes to create complex geometry from simple 2D inputs.*
 
-| **Resonance (Voice to 3D)** |
-| :--- |
-| *Spectral audio analysis. Materializes voice recordings and sound waves into solid 3D frequency landscapes.* |
-| ![Voice to 3D](public/readme_screenshots/voice.webp) |
+| **Profile View** | **Front View** | **Resulting Mesh** |
+| :---: | :---: | :---: |
+| ![Shadow Profile](public/readme_screenshots/shadow_isometric.webp) | ![Shadow Front](public/readme_screenshots/shadow_front.webp) | ![Shadow Result](public/readme_screenshots/shadow_side.webp) |
+
+### 2. Terra-Former (GeoSculptor)
+> *Streaming GIS telemetry reconstruction. Converts raw satellite elevation data into high-fidelity topographic models ready for printing.*
+
+| **Map Selection** | **Terrain Analysis** | **3D Generation** |
+| :---: | :---: | :---: |
+| ![Geo Map](public/readme_screenshots/geo_map.webp) | ![Geo Analysis](public/readme_screenshots/geo_buildings_satalite.webp) | ![Geo Model](public/readme_screenshots/geo_buildings_isometric.webp) |
+
+### 3. Resonance (Voice to 3D)
+> *Spectral audio analysis. Materializes voice recordings and sound waves into solid 3D frequency landscapes.*
+
+| **Audio Input** | **Frequency Shaping** | **Radial Sculpture** |
+| :---: | :---: | :---: |
+| ![Voice Input](public/readme_screenshots/voice_first.webp) | ![Voice Waveform](public/readme_screenshots/voice_seconf.webp) | ![Voice Model](public/readme_screenshots/voice.webp) |
 
 ---
 
