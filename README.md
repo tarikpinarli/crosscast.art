@@ -2,7 +2,7 @@
 
 <div align="center">
   <a href="https://crosscast.art">
-    <img src="public/favicon.png" alt="CrossCast Logo" width="200" height="auto">
+    <img src="public/readme_screenshots/readmehero.webp" alt="CrossCast Logo" width="200" height="auto">
   </a>
 
   <h1 align="center">CrossCast | Generative Design Suite</h1>
