@@ -13,7 +13,7 @@ const MODULE_DATA = [
     color: 'cyan',
     desc: 'Dual-silhouette intersection engine using Constructive Solid Geometry (CSG) to merge two profiles.',
     specs: [
-      'Manifold STL Export',
+      'Manifold glb Export',
       'Boolean Volume Intersect',
       'Automatic Mesh Capping',
       'Optimized for FDM Printing'

@@ -7,6 +7,21 @@ import { ExternalLink, Ruler, Mountain, Copy, X, BoxSelect, AudioLines } from 'l
 
 // --- DATA CONFIGURATION ---
 const SHOWCASE_DATA = [
+    {
+    moduleName: "Shadow Caster",
+    engineId: "shadow",
+    icon: Copy,
+    projects: [
+      {
+        title: "Binary Silhouette v1",
+        stat: "Zero-Error Mesh",
+        desc: "An optical illusion sculpture projecting two distinct shapes.",
+        image: "/showcase_page_images/dual.png", 
+        modelUrl: "/models/dual.glb",
+        tags: ["Resin", "SLA"]
+      }
+    ]
+  },
   {
     moduleName: "Terra-Former",
     engineId: "geo",
@@ -23,31 +38,47 @@ const SHOWCASE_DATA = [
     ]
   },
   {
-    moduleName: "Shadow Caster",
-    engineId: "shadow",
-    icon: Copy,
+    moduleName: "Luminance",
+    engineId: "luminance",
+    icon: AudioLines,
     projects: [
       {
-        title: "Binary Silhouette v1",
-        stat: "Zero-Error Mesh",
-        desc: "An optical illusion sculpture projecting two distinct shapes.",
-        image: "/showcase_page_images/dual.png", 
-        modelUrl: "/models/dual.glb",
-        tags: ["Resin", "SLA"]
+        title: "The Fading Silhouette",
+        stat: "64-Band FFT",
+        desc: "Transform images into wall art.",
+        image: "/showcase_page_images/wall.png", // PLACEHOLDER
+        modelUrl: "/models/lumi.glb", // PLACEHOLDER - Change when you have a glb
+        tags: ["PLA", "Matte"]
       }
     ]
   },
+  
   {
     moduleName: "Resonance",
     engineId: "resonance",
     icon: AudioLines,
     projects: [
       {
-        title: "Voice Totem",
+        title: "The Voice Totem",
         stat: "64-Band FFT",
         desc: "A physical manifestation of a spoken phrase, visualizing frequency over time.",
-        image: "/showcase_page_images/dual.png", // PLACEHOLDER
-        modelUrl: "/models/dual.glb", // PLACEHOLDER - Change when you have a glb
+        image: "/showcase_page_images/voice_show.png", // PLACEHOLDER
+        modelUrl: "/models/voice.glb", // PLACEHOLDER - Change when you have a glb
+        tags: ["PLA", "Matte"]
+      }
+    ]
+  },
+  {
+    moduleName: "Glyph Engine",
+    engineId: "typography",
+    icon: AudioLines,
+    projects: [
+      {
+        title: "Text2Topology",
+        stat: "64-Band FFT",
+        desc: "Text extruded into 3D forms using parametric kerning and bevel logic.",
+        image: "/showcase_page_images/writing.png", // PLACEHOLDER
+        modelUrl: "/models/typography.glb", // PLACEHOLDER - Change when you have a glb
         tags: ["PLA", "Matte"]
       }
     ]

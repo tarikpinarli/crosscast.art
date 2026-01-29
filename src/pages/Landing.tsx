@@ -19,7 +19,7 @@ const MODULES = [
   { 
     id: 'litho', 
     name: 'Luminance', 
-    desc: 'Advanced sub-millimeter displacement mapping. Transform images into light-reactive art.', 
+    desc: 'Advanced sub-millimeter displacement mapping. Transform images into wall art.', 
     icon: Box, 
     path: '/wall-art', 
     status: 'OPERATIONAL', 
