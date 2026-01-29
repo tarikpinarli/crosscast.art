@@ -47,7 +47,7 @@ const PROTOCOLS = [
     icon: AudioLines,
     path: '/resonance',
     color: 'purple',
-    video: '/module_videos/resonance_preview.mov'
+    video: '/module_videos/voice.webm'
   },
   // NEW PROTOCOL
   {
