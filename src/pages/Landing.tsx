@@ -14,7 +14,7 @@ const MODULES = [
     path: '/app/intersection', 
     status: 'OPERATIONAL', 
     color: 'cyan', 
-    videoOverlay: '/module_videos/apple_steve_shadow.mov' 
+    videoOverlay: '/module_videos/apple_steve_shadow.webm' 
   },
   { 
     id: 'litho', 
@@ -24,7 +24,7 @@ const MODULES = [
     path: '/wall-art', 
     status: 'OPERATIONAL', 
     color: 'zinc', 
-    videoOverlay: '/module_videos/tablo.mov' 
+    videoOverlay: '/module_videos/tablo.webm' 
   },
   { 
     id: 'geo', 
@@ -34,7 +34,7 @@ const MODULES = [
     path: '/geo', 
     status: 'OPERATIONAL', 
     color: 'cyan', 
-    videoOverlay: '/module_videos/building_top.mov' 
+    videoOverlay: '/module_videos/building_top.webm' 
   },
   { 
     id: 'resonance', 
@@ -44,7 +44,7 @@ const MODULES = [
     path: '/resonance', 
     status: 'NEW', 
     color: 'purple', 
-    videoOverlay: '/module_videos/resonance_preview.mov' 
+    videoOverlay: '/module_videos/voice.webm' 
   },
   // NEW MODULE
   { 
@@ -55,7 +55,7 @@ const MODULES = [
     path: '/typography', 
     status: 'BETA', 
     color: 'indigo', 
-    videoOverlay: '/module_videos/typography_preview.mov' 
+    videoOverlay: '/module_videos/typography.webm' 
   }
 ];
 

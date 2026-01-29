@@ -14,7 +14,7 @@ const PROTOCOLS = [
     icon: Copy,
     path: '/app/intersection',
     color: 'cyan',
-    video: '/module_videos/apple_steve_shadow.mov'
+    video: '/module_videos/apple_steve_shadow.webm'
   },
   {
     id: 'litho',
@@ -25,7 +25,7 @@ const PROTOCOLS = [
     icon: Box,
     path: '/wall-art',
     color: 'zinc',
-    video: '/module_videos/tablo.mov'
+    video: '/module_videos/tablo.webm'
   },
   {
     id: 'geo',
@@ -36,7 +36,7 @@ const PROTOCOLS = [
     icon: Mountain,
     path: '/geo',
     color: 'cyan',
-    video: '/module_videos/building_top.mov'
+    video: '/module_videos/building_top.webm'
   },
   {
     id: 'resonance',
@@ -59,7 +59,7 @@ const PROTOCOLS = [
     icon: Type,
     path: '/typography',
     color: 'indigo',
-    video: '/module_videos/typography_preview.mov'
+    video: '/module_videos/typography.webm'
   }
 ];
 
