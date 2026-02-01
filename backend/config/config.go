@@ -8,6 +8,7 @@ import (
 type Config struct {
 	Port            string
 	StripeSecretKey string
+	JWTSecret       string
 }
 
 func LoadConfig() *Config {
@@ -16,6 +17,7 @@ func LoadConfig() *Config {
 	return &Config{
 		Port:            getEnv("PORT", "5005"),
 		StripeSecretKey: os.Getenv("STRIPE_SECRET_KEY"),
+		JWTSecret:       getEnv("JWT_SECRET", "default_secret_key_for_dev"),
 	}
 }
 

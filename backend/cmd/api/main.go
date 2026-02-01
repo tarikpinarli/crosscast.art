@@ -9,11 +9,13 @@ import (
 	"github.com/tarikpinarli/dualSculp-backend/config"
 	"github.com/tarikpinarli/dualSculp-backend/internal/handlers"
 	"github.com/tarikpinarli/dualSculp-backend/internal/sockets"
+	"github.com/tarikpinarli/dualSculp-backend/internal/database"
 )
 
 func main() {
 	cfg := config.LoadConfig()
 
+	database.Connect()
 	io := socket.NewServer(nil, nil)
 	sockets.SetupSocket(io)
 	sockHandler := io.ServeHandler(nil)
@@ -26,13 +28,14 @@ func main() {
 	}))
 
 	h := handlers.NewHandler(cfg)
-	
-	// IMPORTANT: Use root group "/" to match your frontend requests
-	api := r.Group("/")
-	{
-		api.GET("/ping", func(c *gin.Context) { c.String(200, "pong") })
-		api.GET("/check-availability", h.CheckAvailability)
+
+    api := r.Group("/")
+    {
+        api.GET("/ping", func(c *gin.Context) { c.String(200, "pong") })
+        api.GET("/check-availability", h.CheckAvailability)
         api.POST("/create-payment-intent", h.CreatePaymentIntent)
+        api.POST("/signup", h.Register)
+		api.POST("/login", h.Login)
 	}
 
 	r.Any("/socket.io/*any", gin.WrapH(sockHandler))
