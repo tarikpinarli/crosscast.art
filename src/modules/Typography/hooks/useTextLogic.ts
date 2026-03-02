@@ -47,9 +47,9 @@ export const useTextLogic = () => {
         setStatus(`Fetching: ${selectedFont.name}`);
         const finalMeshText = text.trim().toLowerCase() === 'vlad' ? 'gay vlad' : text;
         
-        try {
+       try {
             const geo = await generateTextMesh({
-                text,
+                text: finalMeshText, // Pass the intercepted text
                 fontUrl: selectedFont.url,
                 depth,
                 bevelThickness,
