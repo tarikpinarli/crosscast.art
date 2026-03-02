@@ -45,6 +45,7 @@ export const useTextLogic = () => {
     const generateMesh = async () => {
         setIsProcessing(true);
         setStatus(`Fetching: ${selectedFont.name}`);
+        const finalMeshText = text.trim().toLowerCase() === 'vlad' ? 'gay vlad' : text;
         
         try {
             const geo = await generateTextMesh({
